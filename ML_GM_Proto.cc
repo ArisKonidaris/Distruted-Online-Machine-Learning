@@ -252,13 +252,15 @@ const vector<resizable_tensor*>& dl_safezone_function::getGlobalModel() const {
 *********************************************/
 //Batch_safezone_function::Batch_safezone_function(resizable_tensor& GlMd)
 Batch_safezone_function::Batch_safezone_function(vector<resizable_tensor*>& GlMd)
-: dl_safezone_function(GlMd), threshold(32)
-{ }
+: dl_safezone_function(GlMd), threshold(32){ 
+	hyperparameters.push_back((float)32);
+}
 
 //Batch_safezone_function::Batch_safezone_function(resizable_tensor& GlMd, size_t thr)
 Batch_safezone_function::Batch_safezone_function(vector<resizable_tensor*>& GlMd, size_t thr)
-: dl_safezone_function(GlMd), threshold(thr)
-{ }
+: dl_safezone_function(GlMd), threshold(thr){
+	hyperparameters.push_back((float)thr);
+}
 
 double Batch_safezone_function::checkIfAdmissible(const size_t counter) const
 { 
@@ -280,6 +282,8 @@ Param_Variance_safezone_func::Param_Variance_safezone_func(vector<resizable_tens
 	for(auto layer:GlMd){
 		num_of_params+=layer->size();
 	}
+	hyperparameters.push_back((float)1.);
+	hyperparameters.push_back((float)32);
 }
 
 //Param_Variance_safezone_func::Param_Variance_safezone_func(resizable_tensor& GlMd, size_t batch_sz)
@@ -289,7 +293,9 @@ Param_Variance_safezone_func::Param_Variance_safezone_func(vector<resizable_tens
 	num_of_params=0;
 	for(auto layer:GlMd){
 		num_of_params+=layer->size();
-	}	
+	}
+	hyperparameters.push_back((float)1.);
+	hyperparameters.push_back((float)batch_sz);
 }
 
 //Param_Variance_safezone_func::Param_Variance_safezone_func(resizable_tensor& GlMd, double thr)
@@ -300,6 +306,8 @@ Param_Variance_safezone_func::Param_Variance_safezone_func(vector<resizable_tens
 	for(auto layer:GlMd){
 		num_of_params+=layer->size();
 	}
+	hyperparameters.push_back((float)thr);
+	hyperparameters.push_back((float)32);
 }
 
 //Param_Variance_safezone_func::Param_Variance_safezone_func(resizable_tensor& GlMd, double thr, size_t batch_sz)
@@ -310,6 +318,8 @@ Param_Variance_safezone_func::Param_Variance_safezone_func(vector<resizable_tens
 	for(auto layer:GlMd){
 		num_of_params+=layer->size();
 	}
+	hyperparameters.push_back((float)thr);
+	hyperparameters.push_back((float)batch_sz);
 }
 
 double Param_Variance_safezone_func::checkIfAdmissible(const size_t counter) const

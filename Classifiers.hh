@@ -11,6 +11,7 @@
 #include <cmath>
 #include <random>
 #include <time.h>
+#include <fstream>
 
 #include <mlpack/core.hpp>
 #include <mlpack/core/util/cli.hpp>
@@ -1520,10 +1521,11 @@ protected:
 	PointToSource TestSource; // Data Source to read the dataset in streaming form.
 	
 	LeNet net;
-	//vector<tensor*> params;
-	//arma::mat* parameters;
 	resizable_tensor parameters;
 	size_t num_of_par; // The total number of trainable parameters.
+	
+	vector<float> AccuracyHistory;
+	vector<int> DatapointsProcessed;
 	
 public:
 
@@ -1677,9 +1679,13 @@ void LeNet_Classification::Train(){
 	bool init = false;
 	cout << endl << "Size of Streaming Dataset : " << TrainSource->getDatasetLength() << endl << endl;
 	
+	string filename = "/home/aris/Desktop/Diplwmatikh/Starting_Cpp_Developing/Graphs/CentralizedLeNet.csv";
+	std::ofstream myfile;
+	
 	for(size_t ep=0; ep<1; ep++){
 		
 		cout << "Starting epoch " << ep+1 << endl;
+		size_t learning_round = 0;
 		while(TrainSource->isValid()){
 			training_images.clear();
 			training_labels.clear();
@@ -1722,6 +1728,7 @@ void LeNet_Classification::Train(){
 				}
 				net.Synch();
 				count+=mini_batch_samples.size();
+				learning_round+=1;
 				
 				if(!init){
 					CreateParams();
@@ -1731,10 +1738,15 @@ void LeNet_Classification::Train(){
 				
 				// Print info.
 				cout<<endl;
-				if(count%(64*500)==0){
+				if(learning_round%10==0){
 					net.setDropProb(0.);
-					accuracy=net.getAccuracy(test_images,test_labels);
+					accuracy = net.getAccuracy(test_images,test_labels);
 					net.setDropProb(0.5);
+					//AccuracyHistory.push_back(accuracy);
+	                //DatapointsProcessed.push_back(count);
+					myfile.open(filename, std::ios::app);
+					myfile << accuracy << "," << count << "\n";
+					myfile.close();
 				}
 				else{
 					cout << "Accuracy: " << accuracy << endl;	
@@ -1753,6 +1765,12 @@ void LeNet_Classification::Train(){
 		cout << "Accuracy: " << accuracy << endl;
 		cout << "Dara fitted: " << count << endl;
 	}
+	
+	
+	//for(size_t i=0;i<AccuracyHistory.size();i++){
+		//myfile << AccuracyHistory.at(i) << "," << DatapointsProcessed.at(i) << "\n";
+	//}
+	
 
 }
 

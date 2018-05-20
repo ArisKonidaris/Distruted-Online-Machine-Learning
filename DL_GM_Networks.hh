@@ -4,6 +4,8 @@
 #include <boost/range/adaptors.hpp>
 #include <boost/shared_ptr.hpp>
 #include <random>
+#include <fstream>
+#include <iostream>
 
 #include "ML_GM_Proto.hh"
 
@@ -63,6 +65,7 @@ struct coordinator : process
 
 	// index the nodes
 	map<node_t*, size_t> node_index;
+	map<node_t*, size_t> node_proc_points;
 	vector<node_t*> node_ptr;
 
 	coordinator(network_t* nw, dl_continuous_query<feature_t, label_t>* _Q); 
@@ -78,7 +81,7 @@ struct coordinator : process
 
 	// initialize a new round
 	void start_round();
-	void finish_round();
+	void finish_round(node_t* n);
 	void finish_rounds();
 	
 	// rebalance algorithm by Kamp
@@ -87,15 +90,25 @@ struct coordinator : process
 	// get the model of a node
 	void fetch_updates(node_t* n);
 	
+	// Printing and saving the accuracy.
 	void Progress();
+	
+	// Get the communication statistics of experiment.
+	vector<size_t> Statistics() const;
 
 	resizable_tensor computeGlobalModel(const resizable_tensor& Param);
 
 	// remote call on warmed up host
-	oneway end_warmup(sender<node_t> ctx);
+	//oneway end_warmup(sender<node_t> ctx);
+	
+	// Warming up the coordinator.
+	void warmup(std::vector<matrix<feat>>& batch, std::vector<lb>& labels);
+	
+	// Ending the warmup of the network.
+	void end_warmup();
 
 	// remote call on host violation
-	oneway local_violation(sender<node_t> ctx);
+	oneway local_violation(sender<node_t> ctx,  dl_model_state up);
 	
 	set<node_t*> B;					 // initialized by local_violation(), 
 								     // updated by rebalancing algo
@@ -122,6 +135,7 @@ void coordinator<feat,lb>::start_round(){
 	num_rounds++;
 }
 
+/*
 template<typename feat,typename lb>
 oneway coordinator<feat,lb>::end_warmup(sender<node_t> ctx){
 	node_t* n = ctx.value;
@@ -137,27 +151,32 @@ oneway coordinator<feat,lb>::end_warmup(sender<node_t> ctx){
 		global_learner->update_model(Mean);
 		start_round();
 	}
-}
+}*/
 
 template<typename feat,typename lb>
-oneway coordinator<feat,lb>::local_violation(sender<node_t> ctx){
+oneway coordinator<feat,lb>::local_violation(sender<node_t> ctx, dl_model_state up){
 	
 	node_t* n = ctx.value;
 	num_violations++;
 	
 	B.clear(); // Clear the balanced nodes set.
-	for(auto layer:Mean){
-		dlib::cuda::affine_transform(*layer,*layer,0.);
+	for(auto layer:Mean){ // Clear the mean global model.
+		dlib::cuda::affine_transform(*layer,*layer,0.);//Mean=0.; // Clear the mean global model.
 	}
-	//Mean=0.; // Clear the mean global model.
+	
+	for(size_t i=0;i<up._model.size();i++){
+		dlib::cuda::add(1.,*Mean.at(i),1.,*up._model.at(i));
+	}
+	total_updates += up.updates;
+	node_proc_points[n] += up.updates;
 	
 	if( dl_safezone_function* entity = dynamic_cast<Batch_safezone_function*>(safe_zone) ){
 		num_violations = 0;
-		finish_round();
+		finish_round(n);
 	}else{
 		if(num_violations==k){
 			num_violations = 0;
-			finish_round();
+			finish_round(n);
 		}else{
 			Kamp_Rebalance(n);
 		}
@@ -205,20 +224,21 @@ void coordinator<feat,lb>::fetch_updates(node_t* node){
 		dlib::cuda::add(1.,*Mean.at(i),1.,*up._model.at(i));
 	}
 	total_updates += up.updates;
+	node_proc_points[node] += up.updates;
 }
 
 // initialize a new round
 template<typename feat,typename lb>
-void coordinator<feat,lb>::finish_round() {
+void coordinator<feat,lb>::finish_round(node_t* nf) {
 
 	// Collect all data
 	for(auto n : node_ptr) {
-		fetch_updates(n);
+		if(nf!=n)
+			fetch_updates(n);
 	}
 	for(auto layer:Mean){
-		dlib::cuda::affine_transform(*layer,*layer,(float)std::pow(k,-1));
+		dlib::cuda::affine_transform(*layer,*layer,(float)std::pow(k,-1)); //Mean /= (float)k;
 	}
-	//Mean /= (float)k;
 
 	// New round
 	query->update_estimate(Mean);
@@ -254,7 +274,7 @@ void coordinator<feat,lb>::Kamp_Rebalance(node_t* lvnode){
 	}
 	assert(B.size()+Bcompl.size()==k);
 	
-	fetch_updates(lvnode);
+	//fetch_updates(lvnode);
 	for(auto n:Bcompl){
 		fetch_updates(n);
 		B.insert(n);
@@ -296,10 +316,12 @@ void coordinator<feat,lb>::Progress(){
 	if(Q->config.learning_algorithm == "LeNet"){
 		query->accuracy = Q->queryAccuracy(global_learner);
 	}
+	
 	cout << "accuracy : " << std::setprecision(6) << (float)100.*query->accuracy << "%" << endl;
 	cout << "Number of rounds : " << num_rounds << endl;
 	cout << "Number of subrounds : " << num_subrounds << endl;
 	cout << "Total updates : " << total_updates << endl;
+	cout << endl;
 }
 
 template<typename feat,typename lb>
@@ -313,8 +335,10 @@ void coordinator<feat,lb>::finish_rounds(){
 	query->accuracy = Q->queryAccuracy(global_learner);
 	
 	// See the total number of points received by all the nodes. For debugging.
-	for(auto nd:node_ptr){
-		total_updates += nd->_learner->getNumOfUpdates();
+	for(auto n:node_ptr){
+		size_t updates = n->_learner->getNumOfUpdates();
+		total_updates += updates;
+		node_proc_points[n] += updates;
 	}
 	
 	// Print the results.
@@ -330,16 +354,52 @@ void coordinator<feat,lb>::finish_rounds(){
 }
 
 template<typename feat,typename lb>
+vector<size_t>  coordinator<feat,lb>::Statistics() const{
+	vector<size_t> stats;
+	stats.push_back(num_rounds);
+	stats.push_back(num_subrounds);
+	stats.push_back(sz_sent);
+	return stats;
+}
+
+template<typename feat,typename lb>
 void coordinator<feat,lb>::setup_connections(){
 	using boost::adaptors::map_values;
 	proxy.add_sites(net()->sites);
 	for(auto n : net()->sites) {
 		node_index[n] = node_ptr.size();
+		node_proc_points[n]=0;
 		node_ptr.push_back(n);
 	}
 	k = node_ptr.size();
 }
 
+
+template<typename feat,typename lb>
+void coordinator<feat,lb>::warmup(std::vector<matrix<feat>>& batch, std::vector<lb>& labels){
+	global_learner->fit(batch,labels);
+	total_updates+=batch.size();
+	if(query->GlobalModel.size()==0){
+		query->initializeGlobalModel(global_learner->Parameters());
+		for(auto layer:global_learner->Parameters()){
+			resizable_tensor* l;
+			l=new resizable_tensor();
+			l->set_size(layer->num_samples(),layer->k(),layer->nr(),layer->nc());
+			*l=0.;
+			Mean.push_back(l);
+		}
+	}
+}
+
+template<typename feat,typename lb>
+void coordinator<feat,lb>::end_warmup(){
+	for(size_t i=0;i<Mean.size();i++){
+		dlib:memcpy(*Mean.at(i),*global_learner->Parameters().at(i));
+	}
+	query->update_estimate(Mean);
+	start_round();
+}
+	
 template<typename feat,typename lb>
 void coordinator<feat,lb>::initializeLearner(){
 	if (cfg().learning_algorithm == "LeNet"){
@@ -382,7 +442,7 @@ struct coord_proxy : remote_proxy<coordinator<feat,lb>>
 {
 	using coordinator_t = coordinator<feat,lb>;
 	REMOTE_METHOD(coordinator_t, local_violation);
-	REMOTE_METHOD(coordinator_t, end_warmup);
+	//REMOTE_METHOD(coordinator_t, end_warmup);
 	coord_proxy(process* c) : remote_proxy<coordinator_t>(c) { } 
 };
 
@@ -424,10 +484,6 @@ struct learning_node : local_site {
 
 	void setup_connections() override;
 
-	void warmup(std::vector<matrix<feature_t>>& batch, std::vector<label_t>& labels);
-	
-	void end_warmup();
-
 	void update_stream(std::vector<matrix<feature_t>>& batch, std::vector<label_t>& labels);
 
 	//
@@ -467,16 +523,6 @@ void learning_node<feat,lb>::set_drift(tensor_message mdl){
 }
 
 template<typename feat,typename lb>
-void learning_node<feat,lb>::warmup(std::vector<matrix<feature_t>>& batch, std::vector<label_t>& labels){
-	_learner->fit(batch,labels);
-}
-
-template<typename feat,typename lb>
-void learning_node<feat,lb>::end_warmup(){
-	coord.end_warmup(this);
-}
-
-template<typename feat,typename lb>
 void learning_node<feat,lb>::update_stream(std::vector<matrix<feature_t>>& batch, std::vector<label_t>& labels){
 	_learner->fit(batch,labels);
 	datapoints_seen += batch.size();
@@ -485,12 +531,12 @@ void learning_node<feat,lb>::update_stream(std::vector<matrix<feature_t>>& batch
 		if(szone(datapoints_seen) <= 0.){
 			datapoints_seen = 0;
 			if(szone(_learner->Parameters())<0.){
-				coord.local_violation(this);
+				coord.local_violation(this, dl_model_state(_learner->Parameters(), _learner->getNumOfUpdates()));
 			}
 		}
 	}else{
 		if(szone(datapoints_seen) <= 0.)
-			coord.local_violation(this);
+			coord.local_violation(this, dl_model_state(_learner->Parameters(), _learner->getNumOfUpdates()));
 	}
 }
 
@@ -498,13 +544,40 @@ template<typename feat,typename lb>
 void learning_node<feat,lb>::initializeLearner(){
 	if (cfg().learning_algorithm == "LeNet"){
 		_learner = new LeNet<feature_t,label_t>();
+		
+		std::vector<matrix<feature_t>> random_image_init;
+		std::vector<label_t> random_label_init;
+		matrix<feature_t, 28, 28> random_image;
+		for(size_t rows=0;rows<28;rows++){
+			for(size_t cols=0;cols<28;cols++){
+				random_image(rows,cols)=(feature_t)std::rand()%(256);
+			}
+		}
+		random_image_init.push_back(random_image);
+		random_label_init.push_back((label_t)1);
+		_learner->fit(random_image_init,random_label_init);
+		_learner->getNumOfUpdates();
 	}
+	
 }
 
 template<typename feat,typename lb>
 void learning_node<feat,lb>::setup_connections(){
 	num_sites = coord.proc()->k;
 }
+
+/*
+template<typename feat,typename lb>
+void learning_node<feat,lb>::warmup(std::vector<matrix<feature_t>>& batch, std::vector<label_t>& labels){
+	_learner->fit(batch,labels);
+}
+
+
+template<typename feat,typename lb>
+void learning_node<feat,lb>::end_warmup(){
+	coord.end_warmup(this);
+}
+*/
 
 template<typename feat,typename lb>
 struct learning_node_proxy : remote_proxy< learning_node<feat,lb> >

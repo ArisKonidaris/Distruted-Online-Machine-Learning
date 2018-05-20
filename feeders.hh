@@ -3,6 +3,8 @@
 
 #include "ML_GM_Networks.hh"
 #include "DL_GM_Networks.hh"
+#include <fstream>
+#include <iostream>
 
 namespace feeders{
 
@@ -474,6 +476,7 @@ protected:
 	
 	net_container<feats,lb> _net_container; // A container for networks.
 	query_container<feats,lb> _query_container; // A container for queries.
+	vector<chan_frame> stats; // Statistics collection.
 	
 public:
 	/** 	
@@ -568,6 +571,9 @@ void DLIB_feeder<feats,lb>::initializeSimulation(){
 		auto net = new network<feats,lb>(node_ids, net_name, _query_container.at(i-1));
 		addNet(net);
 		cout << "Net " << net_name << " initialized." << endl << endl;
+	}
+	for(auto net:_net_container){
+		stats.push_back(chan_frame(net));
 	}
 	cout << endl << "Netwoks initialized." << endl;
 }
@@ -739,12 +745,12 @@ void LeNet_Feeder<feats,lb>::TrainNetworks(){
 			count += TrainSource->getBufferSize();
 			
 			// Warming up the nets if necessary.
-			if(!warm){ // We warm up the networks.
+			if(!warm){
 				if(training_images.size() <= this->warmupSize-degrees){ // A part of the warmup dataset is on the buffer.
 					degrees += training_images.size();
 					size_t posit1=0;
 					bool done1=false;
-					while(posit1<training_images.size()&&(!done1)){
+					while(posit1<training_images.size()){
 						mini_batch_samples.clear();
 						mini_batch_labels.clear();
 						while(mini_batch_samples.size()<this->batchSize){
@@ -753,22 +759,20 @@ void LeNet_Feeder<feats,lb>::TrainNetworks(){
 								mini_batch_labels.push_back(training_labels[posit1]);
 								posit1++;
 							}else{
-								done1=true;
 								break;
 							}
 						}
+						// Warming up the hubs of the star networks.
 						for(auto net:this->_net_container){
-							// Picking a random node to train.
-							for(size_t i=0;i<net->sites.size();i++){
-								net->warmup(i, mini_batch_samples, mini_batch_labels);
-							}
+							net->warmup(mini_batch_samples, mini_batch_labels);
 						}
 					}
+					TrainSource->advance();
 					continue;
 				}else{ // The last chunk of the warmup dataset.
 					size_t posit1=0;
 					bool done1=false;
-					while(posit1<(this->warmupSize-degrees)&&(!done1)){
+					while(posit1<(this->warmupSize-degrees)){
 						mini_batch_samples.clear();
 						mini_batch_labels.clear();
 						while(mini_batch_samples.size()<this->batchSize){
@@ -777,15 +781,12 @@ void LeNet_Feeder<feats,lb>::TrainNetworks(){
 								mini_batch_labels.push_back(training_labels[posit1]);
 								posit1++;
 							}else{
-								done1=true;
 								break;
 							}
 						}
+						// Warming up the hubs of the star networks.
 						for(auto net:this->_net_container){
-							// Picking a random node to train.
-							for(size_t i=0;i<net->sites.size();i++){
-								net->warmup(i, mini_batch_samples, mini_batch_labels);
-							}
+							net->warmup(mini_batch_samples, mini_batch_labels);
 						}
 					}
 					// Removing the warm up data from the buffer.
@@ -793,11 +794,10 @@ void LeNet_Feeder<feats,lb>::TrainNetworks(){
 						training_images.erase(training_images.begin());
 						training_labels.erase(training_labels.begin());
 					}
+					// Initializing all the nodes. Starting the first round.
 					for(auto net:this->_net_container){
 						// Each hub initializes the first round.
-						for(size_t i=0;i<net->sites.size();i++){
-							net->end_warmup(i);
-						}
+						net->end_warmup();
 					}
 					warm = true;
 				}
@@ -823,10 +823,15 @@ void LeNet_Feeder<feats,lb>::TrainNetworks(){
 				Train(mini_batch_samples,mini_batch_labels);
 			}
 
-			// Get the next 5000 data points from disk to stream them.
+			// Get the next 1000 data points from disk to stream them.
 			TrainSource->advance();
-			cout << "count : " << count << endl;
-			if(count%10000==0){
+			
+			// Print some info. 
+			// You can alter the polling rate here to tradeoff between info and speed of execution.
+			if(count%100000==0){
+				cout << "count : " << count << endl << endl;
+			}
+			if(count%200000==0){
 				for(auto net:this->_net_container){
 					net->hub->Progress();
 				}
@@ -837,11 +842,41 @@ void LeNet_Feeder<feats,lb>::TrainNetworks(){
 		TrainSource->rewind();
 	}
 	
-	for(auto net:this->_net_container){
-		net->process_fini();
+	for(size_t net=0;net<this->_net_container.size();net++){
+		this->_net_container.at(net)->process_fini();
+		std::ofstream myfile;
+		myfile.open("/home/aris/Desktop/Diplwmatikh/Starting_Cpp_Developing/Graphs/Distr_Learn_CommTest.csv",std::ios::app);
+		size_t total_messages = 0;
+		size_t total_info_messages = 0;
+		size_t total_bytes = 0;
+		vector<size_t> com_stats = this->_net_container.at(net)->hub->Statistics();
+		for(auto chnl:this->stats.at(net)){
+			total_messages+=chnl->messages_received();
+			if(chnl->bytes_received()>0){
+				total_info_messages+=chnl->messages_received();
+				total_bytes+=chnl->bytes_received();
+			}
+		}
+		//myfile << "NetName,DistAlgo,LearnAlgo,LocalSites,Rounds,Subrounds,Safezones,TotalMessages,TotalInfoMessages,TotalBytes,accuracy,threshold\n"
+		myfile << this->_net_container.at(net)->name()
+			   << "," << this->_net_container.at(net)->hub->cfg().distributed_learning_algorithm
+			   << "," << this->_net_container.at(net)->hub->cfg().learning_algorithm
+		       << "," << this->_net_container.at(net)->sites.size()
+		       << "," << com_stats.at(0) 
+		       << "," << com_stats.at(1) 
+			   << "," << com_stats.at(2)
+			   << "," << total_messages 
+			   << "," << total_info_messages
+			   << "," << total_bytes
+			   << "," << (float)100.0*this->_net_container.at(net)->hub->query->accuracy
+			   << "," << std::to_string(this->_net_container.at(net)->hub->safe_zone->hyper().at(0))
+			   << "," << std::to_string(this->_net_container.at(net)->hub->safe_zone->hyper().at(1))
+			   << "\n";
+		myfile.close();
 	}
 	count = 0;
 	TrainSource->rewind();
+	
 }
 
 template<typename feats, typename lbs>

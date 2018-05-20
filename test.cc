@@ -9,6 +9,7 @@
 #include <cassert>
 #include <iomanip>
 #include <unordered_map>
+#include <fstream>
 
 #include <dlib/dnn.h>
 #include <dlib/cuda/tensor_tools.h>
@@ -63,6 +64,15 @@ int main(void){
 	end = std::chrono::steady_clock::now(); // Stop counting time.
 	
 	cout << "Dlib Performance : " << std::chrono::duration<double, std::milli>(end-start).count() << endl;
+	
+	std::ofstream myfile;
+	std::string filename = "kaloukaloumba.csv";
+	
+	myfile.open(filename);
+	myfile << 1 << "," << 2 << "\n";
+	myfile << 3 << "," << 4 << "\n";
+	myfile << 5 << "," << 6 << "\n"; 
+	myfile.close();
 	
 	return 0;
 }

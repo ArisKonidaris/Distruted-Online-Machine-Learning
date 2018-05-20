@@ -396,6 +396,7 @@ struct dl_safezone_function {
 	//resizable_tensor& GlobalModel; // The global model.
 	vector<resizable_tensor*>& GlobalModel; // The global model.
 	size_t num_of_params; // The number on parameters.
+	vector<float> hyperparameters; // Avector of hyperparameters.
 	
 	//dl_safezone_function(resizable_tensor& mdl);
 	dl_safezone_function(vector<resizable_tensor*>& mdl);
@@ -408,6 +409,7 @@ struct dl_safezone_function {
 	virtual double checkIfAdmissible(const vector<resizable_tensor*>& pars) const { return 0.; }
 	virtual double checkIfAdmissible(const vector<tensor*>& pars) const { return 0.; }
 	virtual size_t byte_size() const { return 0; }
+	vector<float> hyper() const { return hyperparameters; }
 	virtual void pr() { cout << endl << "Simple safezone function." << endl; }
 };
 
@@ -725,6 +727,7 @@ struct dl_gm_learning_network : star_network<Net<feat,lb>, Coord<feat,lb>, Node<
 			return basic_network::create_channel(src, dst, endp);
 	}
 	
+	/*
 	/// This is called to update a specific learning node in the network.
 	void warmup(size_t site, std::vector<matrix<feat>>& batch, std::vector<lb>& labels){
 		this->source_site( this->sites.at(site)->site_id() )->warmup(batch, labels);		
@@ -733,15 +736,25 @@ struct dl_gm_learning_network : star_network<Net<feat,lb>, Coord<feat,lb>, Node<
 	/// This is called to update a specific learning node in the network.
 	void end_warmup(size_t site){
 		this->source_site( this->sites.at(site)->site_id() )->end_warmup();		
+	}*/
+	
+	virtual void warmup(std::vector<matrix<feat>>& batch, std::vector<lb>& labels){
+		// let the coordinator initialize the nodes
+		this->hub->warmup(batch,labels);
+	}
+	
+	/// This is called to update a specific learning node in the network.
+	void end_warmup(){
+		this->hub->end_warmup();		
+	}
+	
+	virtual void start_round(){
+		this->hub->start_round();
 	}
 	
 	/// This is called to update a specific learning node in the network.
 	void process_record(size_t site, std::vector<matrix<feat>>& batch, std::vector<lb>& labels){
 		this->source_site( this->sites.at(site)->site_id() )->update_stream(batch, labels);		
-	}
-	
-	virtual void start_round(){
-		this->hub->start_round();
 	}
 
 	virtual void process_fini(){

@@ -2,8 +2,9 @@
 
 	"simulations":{
 		"encoding" : "UTF-8",
-		"net_name_1" : "net2",
+		"net_name_1" : "net1",
 		"net_name_2" : "net2",
+		"net_name_3" : "net3",
 		"number_of_networks" : 1,
 		"learning_problem" : "classification",
 		"data" : "tests_hdf5_Data",
@@ -14,7 +15,7 @@
 	"tests_hdf5_Data":{
 		"encoding" : "UTF-8",
 		"batch_size" : 64,
-		"warmup_size" : 256, // k times the batch size
+		"warmup_size" : 1000, // Max size : 1000 data points.
 		"test_size" : 10000,
 		"epochs" : 1
 	},
@@ -31,33 +32,85 @@
 
 	"gm_network_net1":{ // format : gm_network_<network_name>
 		"encoding" : "UTF-8",
-		"number_of_local_nodes" : 4,
+		"number_of_local_nodes" : 16,
 		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
 		"image_width" : 28,
 		"image_height" : 28,
 		"number_of_channels" : 1,
-		"distributed_learning_algorithm" : "dist_algo_net1"
+		"distributed_learning_algorithm" : "dist_algo_net9"
 	},
 	
 	"gm_network_net2":{ // format : gm_network_<network name>
 		"encoding" : "UTF-8",
-		"number_of_local_nodes" : 4,
+		"number_of_local_nodes" : 16,
 		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
 		"image_width" : 28,
 		"image_height" : 28,
 		"number_of_channels" : 1,
-		"parameters_of_learner" : "Parameters_Passive_Aggressive_Classifier",
 		"distributed_learning_algorithm" : "dist_algo_net2"
 	},
 
+	"gm_network_net3":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 16,
+		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
+		"image_width" : 28,
+		"image_height" : 28,
+		"number_of_channels" : 1,
+		"distributed_learning_algorithm" : "dist_algo_net3"
+	},
+
 	"dist_algo_net1":{
-		"algorithm" : "Batch_Learning",
-		"batch_size" : 192 // 64, 128, 192, 256, 320
+		"algorithm" : "Michael_Kamp",
+		"threshold" : 0.0008,
+		"batch_size" : 64
 	},
 	
 	"dist_algo_net2":{
 		"algorithm" : "Michael_Kamp",
+		"threshold" : 0.0008,
+		"batch_size" : 128
+	},
+
+	"dist_algo_net3":{
+		"algorithm" : "Michael_Kamp",
+		"threshold" : 0.0008,
+		"batch_size" : 192
+	},
+	
+	"dist_algo_net4":{
+		"algorithm" : "Michael_Kamp",
 		"threshold" : 0.008,
+		"batch_size" : 64
+	},
+
+	"dist_algo_net5":{
+		"algorithm" : "Michael_Kamp",
+		"threshold" : 0.008,
+		"batch_size" : 128
+	},
+
+	"dist_algo_net6":{
+		"algorithm" : "Michael_Kamp",
+		"threshold" : 0.008,
+		"batch_size" : 192
+	},
+
+	"dist_algo_net7":{
+		"algorithm" : "Michael_Kamp",
+		"threshold" : 0.08,
+		"batch_size" : 64
+	},
+
+	"dist_algo_net8":{
+		"algorithm" : "Michael_Kamp",
+		"threshold" : 0.08,
+		"batch_size" : 128
+	},
+
+	"dist_algo_net9":{
+		"algorithm" : "Michael_Kamp",
+		"threshold" : 0.08,
 		"batch_size" : 192
 	},
 
