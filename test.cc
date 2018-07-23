@@ -10,69 +10,87 @@
 #include <iomanip>
 #include <unordered_map>
 #include <fstream>
+#include <random>
 
 #include <dlib/dnn.h>
+#include <dlib/dnn/tensor_tools.h>
 #include <dlib/cuda/tensor_tools.h>
 #include <dlib/data_io.h>
 #include <dlib/image_processing.h>
 #include <dlib/image_io.h>
 
+#include "dsource.hh"
+#include "dsarch.hh"
+
 using std::cout;
 using std::endl;
 using std::vector;
+using std::set;
 
 const size_t NUM_OF_SITES = 6;
 const size_t NUM_OF_SVS = 10;
 const size_t NUM_OF_FEATURES = 5;
 
-using namespace dlib;
+//using namespace dlib;
+using namespace H5;
+using namespace data_src;
 typedef std::chrono::time_point<std::chrono::steady_clock> chr_time;
+typedef boost::shared_ptr<hdf5Source<double>> PointToSource;
 
 int main(void){
 	
-	srand(static_cast<unsigned>(time(0)));
-	chr_time start; // Starting time of the algorithm.
-	chr_time end; // Ending time of the algorithm.
-	resizable_tensor a(1000000,2,1,1);
-	resizable_tensor b(1000000,2,1,1);
-	
-	for(size_t i=0;i<a.size();i++){
-		a.host()[i]=(float)i;
-		b.host()[i]=(float)i+static_cast<float>(std::rand())/static_cast<float>(RAND_MAX);
+	long int seed = -1;
+	if(seed>=0){
+		std::srand (seed);
+	}else{
+		std::srand (time(&seed));
 	}
 	
-	// Read from file and write to new a hdf5 dataset.
-	start = std::chrono::steady_clock::now(); // Start counting time.
 	
-	resizable_tensor subtr(1000000,2,1,1);
-	for(size_t i=0;i<subtr.size();i++){
-		subtr.host()[i]=a.host()[i]-b.host()[i];
-	}	
-	cout <<"Dot : " << dot(subtr,subtr) << endl;
+	float percentage = 0.5;
+	size_t nodes = 8;
+	set<set<set<size_t>>> dist;
 	
-	end = std::chrono::steady_clock::now(); // Stop counting time.
-	cout << "Dlib Performance : " << std::chrono::duration<double, std::milli>(end-start).count() << endl;
+	set<size_t> B;
+	set<size_t> B_compl;
 	
-	// Read from file and write to new a hdf5 dataset.
-	start = std::chrono::steady_clock::now(); // Start counting time.
+	for(size_t i=0; i<nodes; i++){
+		B_compl.insert(i);
+	}
 	
-	resizable_tensor sub(b);
-	sub*=-1.;
-	dlib::cuda::add(1.,sub,1.,a);
-	cout <<"Dot : " << dot(sub,sub) << endl;
+	for(size_t i=0; i<std::floor(nodes*percentage); i++){
+		size_t n = std::rand()%(nodes);
+		while(B.find(n) != B.end()){
+			n = std::rand()%(nodes);
+		}
+		B.insert(n);
+		B_compl.erase(n);
+	}
 	
-	end = std::chrono::steady_clock::now(); // Stop counting time.
+	for(size_t n : B)
+		cout << n << endl;
+	cout << endl;
+	for(size_t n : B_compl)
+		cout << n << endl;
+		
+	cout << "//////" << endl;
 	
-	cout << "Dlib Performance : " << std::chrono::duration<double, std::milli>(end-start).count() << endl;
-	
-	std::ofstream myfile;
-	std::string filename = "kaloukaloumba.csv";
-	
-	myfile.open(filename);
-	myfile << 1 << "," << 2 << "\n";
-	myfile << 3 << "," << 4 << "\n";
-	myfile << 5 << "," << 6 << "\n"; 
-	myfile.close();
-	
+	int p[nodes]={};
+	for(size_t i =0; i<100; i++){
+		double n = ((double) rand() / (RAND_MAX));
+		if(n<0.75){
+			auto it = B.begin();
+			std::advance(it, (int)(std::rand()%(B.size())));
+			++p[*it];
+		}else{
+			auto it = B_compl.begin();
+			std::advance(it, (int)(std::rand()%(B_compl.size())));
+			++p[*it];
+		}
+	}
+		
+	for (size_t i=0; i<nodes; ++i)
+		cout << i << " : " << p[i] << endl;	
+		
 	return 0;
 }

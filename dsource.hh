@@ -291,10 +291,12 @@ hdf5Source<T>::hdf5Source(H5std_string fname, H5std_string dname, bool ld_ids)
 	// Declare the necessary object variables
 	dataset_length = dims_out[0];
 	load_ids = ld_ids;
-	data_size = dims_out[1]-1;
-	if(ld_ids){
-		data_size += 1;
+	data_size = dims_out[1];
+	if(!ld_ids){
+		data_size -= 1;
 	}
+	
+	cout << endl << "Dataset size : " << dataset_length << endl;
 	
 	// start iteration
 	rewind();

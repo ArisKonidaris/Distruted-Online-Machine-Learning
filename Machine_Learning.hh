@@ -58,10 +58,9 @@ using dlib::layer;
 class MLPACK_Learner{
 protected:
 	Json::Value root; // JSON file to read the hyperparameters.
-	arma::mat _model; // The model parameters in matrix form.
+	//arma::mat _model; // The model parameters in matrix form.
+	vector<arma::mat*> vector_model; // The models' parameter layers in a vector.
 	size_t numberOfUpdates; // The number of time the parameters have been updated.
-	string kernel = "no_kernel"; // The name of the kernel that is used by the algorithm.
-	vector<double> kernel_params; // The parameters of the given kernel (if any).
 public:
 	MLPACK_Learner() { }
 	
@@ -72,19 +71,22 @@ public:
 	}
 	
 	// All these functions must be overridden by its descendants
-	virtual void initializeModel(size_t sz) =0;
-	virtual void update_model(arma::mat w) =0;
-	virtual void update_model_by_ref(const arma::mat& w) =0;
-	virtual void fit(const arma::mat& point, const arma::mat& label) =0;
-	virtual arma::mat predict(const arma::mat& point) const =0;
-	virtual inline arma::mat& getModel() { return _model; }
-	virtual inline arma::mat* getPModel() { return &_model; }
-	virtual inline string& getKernel() { return kernel; }
-	virtual inline vector<double>& getKernelParams() { return kernel_params; }
+	virtual void initializeModel(size_t sz) { }
+	virtual void initializeModel(size_t sz1, size_t sz2) { }
+	//virtual void update_model(arma::mat w) { }
+	//virtual void update_model_by_ref(const arma::mat& w) { }
+	virtual void update_model(const vector<arma::mat>& w) { }
+	virtual void handleVD(size_t sz) { }
+	virtual void handleRD(size_t sz) { }
+	virtual void fit(const arma::mat& point, const arma::mat& label) { }
+	virtual arma::mat predict(const arma::mat& point) const { return nullptr; }
+	//virtual inline arma::mat& getModel() { return _model; }
+	virtual inline vector<arma::mat*>& getModel() { return vector_model; }
+	virtual inline vector<arma::mat*>& getHModel() { vector<arma::mat*> empt_vec; return empt_vec; }
+	virtual inline void restoreModel(const vector<arma::mat*>& params) { }
 	virtual inline double accuracy(const arma::mat& testbatch, const arma::mat& labels) const { return 0.; }
-	virtual inline size_t byte_size() const =0;
-	virtual inline arma::SizeMat modelDimensions() const { return arma::size(_model); }
-	virtual inline size_t numberOfSVs() const { return 0; }
+	virtual inline size_t byte_size() const { return 0; }
+	virtual inline vector<arma::SizeMat> modelDimensions() const { vector<arma::SizeMat> empt_vec; return empt_vec; }
 };
 
 template<typename feats,typename lbs>
@@ -109,7 +111,6 @@ public:
 	// All these functions must be overridden by its descendants
 	virtual void initialize_size() =0;
 	virtual void initializeTrainer() =0;
-	//virtual void update_model(const resizable_tensor& w) =0;
 	virtual void update_model(const vector<resizable_tensor>& w) =0;
 	virtual void update_model(const vector<resizable_tensor*>& w) =0;
 	virtual void fit(const input_features& point, const input_labels& label) =0;
@@ -141,11 +142,8 @@ public:
 	// Initialize the parameters of the model.
 	void initializeModel(size_t sz) override;
 	
-	// Set the parameters of the model.
-	void update_model(arma::mat w) override;
-	
 	// Update the parameters of the model.
-	void update_model_by_ref(const arma::mat& w) override;
+	void update_model(const vector<arma::mat>& w) override;
 	
 	// Stream update.
 	void fit(const arma::mat& point, const arma::mat& labels) override;
@@ -170,171 +168,65 @@ public:
 		return (double)errors;
 	}
 	
-	inline arma::mat& getModel() override { _model(_model.n_rows-1,0)=intercept; return _model; }
-	inline arma::mat* getPModel() override { _model(_model.n_rows-1,0)=intercept; return &_model; }
-	inline size_t byte_size() const override { return sizeof(double)*(W.n_elem); }
-	inline arma::SizeMat modelDimensions() const override { return arma::size(_model); }
+	inline vector<arma::mat*>& getModel() override;
+	inline vector<arma::SizeMat> modelDimensions() const override;
+	inline size_t byte_size() const override { return sizeof(float)*(W.n_elem+1); }
 };
 
 
 /*********************************************
-	Kernel Passive Aggressive Classifier
+	 Extreme Learning Machine Classifier
 *********************************************/
 
-class Kernel{
-public:
-	Kernel() { }
-	virtual inline double HilbertDot(arma::dvec& a, arma::dvec& b) const { return 0.; }
-};
-
-class PolynomialKernel : public Kernel{
+class ELM_Classifier : public MLPACK_Learner {
 protected:
-	int degree;
-	double offset;
-public:
-	PolynomialKernel(int deg, double off):degree(deg), offset(off) { }
-	PolynomialKernel(int deg):degree(deg), offset(0.) { }
-	PolynomialKernel(double off):degree(2), offset(off) { }
-	PolynomialKernel():degree(2), offset(0.) { }
-	
-	// Setters.
-	void setDegree(int deg) { degree = deg; }
-	void setOffset(double off) { offset = off; }
-	
-	// Getters.
-	int getDegree() const { return degree; }
-	double getOffset() const { return offset; }
-	
-	double HilbertDot(arma::dvec& a, arma::dvec& b) const override
-	{
-		return std::pow(arma::dot(a,b) + offset, degree);
-	}
-	
-};
 
-class RbfKernel : public Kernel{
-protected:
-	double gamma;
-public:
-	RbfKernel():gamma(0.5) { }
-	RbfKernel(double gam):gamma(gam) { }
-	
-	
-	// Setters.
-	void setGamma(double gam) { gamma = gam; }
-	void setGammaViaSigma(double sigma) { gamma = 1 / ( 2*std::pow(sigma,2) ); }
-	
-	// Getters.
-	double getGamma() const { return gamma; }
-	
-	double HilbertDot(arma::dvec& a, arma::dvec& b) const override
-	{
-		arma::dvec c = a-b;
-		return std::exp( -gamma * arma::dot(c,c) );
-	}
-	
-};
+	arma::mat A; // Hidden Layer Weights.
+	arma::mat b; // Hidden Layer Biases.
+	arma::mat beta; // Output Learnable Parameters.
+	arma::mat K; // Autocorrelation matrix of hidden layer matrix H.
+	size_t num_of_neurons; // The number of neurons the hidden layer has.
+	vector<arma::mat*> hidden_parameters; // The vector containing the static hidden variables.
+	Json::Value root; // JSON file to read the hyperparameters.
 
-/*********************************************
-	Fast_Kernel Passive Aggressive Classifier
-*********************************************/
-
-struct SV_index {
-	int index;
-	double La_Mult;
-	
-	SV_index(int indx, double lmult):index(indx), La_Mult(lmult) { }
-	
-};
-
-struct indexComp {
-	bool operator() (const SV_index& index1, const SV_index& index2){
-		return index1.La_Mult<index2.La_Mult;
-	}
-};
-
-typedef std::set<SV_index,indexComp> index_set;
-
-class KernelPassiveAgressiveClassifier : public MLPACK_Learner {
-protected:
-	string regularization; // Regularization technique.
-	double C; // Regularization C term. [optional]
-	
-	size_t maxSVs; // Maximum number of support vectors to be held in memory.
-	index_set position_set; // The indexes of SVs in the parameter matrix.
-	arma::mat SVs; // The support vectors.
-	arma::mat coefs; // The corresponding Lagrange multipliers of the Support Vectors.
-	
-	double a; // Sparse Passive Aggressive parameter a.
-	double b; // Sparse Passive Aggressive parameter b.
-	
-	time_t seed; // A seed based on time.
-	long int time_seed; /** Give any non negative value for random reproducibility
-	                        and any negative value for "completely random results". */
-	
 public:
 
-	KernelPassiveAgressiveClassifier(string cfg, string net_name);
+	// Constructor
+	ELM_Classifier(string cfg, string net_name);
 	
-	// Initialize the parameters of the model.
-	void initializeModel(size_t sz) override;
+	// Method that initializes the learner.
+	void initializeModel(size_t num_of_feats, size_t num_of_classes) override;
 	
-	// Set the parameters of the model.
-	void update_model(arma::mat w) override;
+	// Method that updates the parameters of the model.
+	void update_model(const vector<arma::mat>& w) override;
 	
-	// Update the parameters of the model.
-	void update_model_by_ref(const arma::mat& w) override;
+	// Method that expands each neuron with sz weights. This happens in case of Virtual Concept Drift.
+	void handleVD(size_t sz);
 	
-	// Update the reference model. This matrices is used for calculating the margin.
-	void updateRefModel();
+	// Method that expands the beta vector by sz parameters. This happens in case of Real Concept Drift.
+	void handleRD(size_t sz);
 	
 	// Stream update.
-	void fit(const arma::mat& batch, const arma::mat& labels) override;
+	void fit(const arma::mat& batch, const arma::mat& label) override;
 	
 	// Make a prediction.
 	arma::mat predict(const arma::mat& batch) const override;
 	
-	// Get the margin.
-	double Margin(arma::dvec& data_point) const;
-	
-	// The Hilbert dot product of the corresponding kernel.
-	double HilbertDot(const arma::dvec& data_point1, const arma::dvec& data_point2) const;
-	
 	// Get score.
-	inline double accuracy(const arma::mat& testbatch, const arma::mat& labels) const override{
-		size_t errors=0;
-		if(kernel=="poly"){
-			arma::mat predictions = coefs.t()*arma::pow( SVs*testbatch + kernel_params.at(1), (int)kernel_params.at(0));
-			for(size_t i =0; i<labels.n_cols; i++){
-				if( (labels(0,i)<0. && predictions(0,i)>=0.) || (labels(0,i)>0. && predictions(0,i)<0.) )
-					errors++;
-			}
-		}else{
-			for(size_t i=0;i<labels.n_cols;i++){
-				arma::dvec point = testbatch.unsafe_col(i);
-				if(this->Margin(point) >= 0.){
-					//errors = (labels(0,i)==1.) ? errors : ++errors;
-					if(labels(0,i)==1.)
-						continue;
-					errors++;
-				}else{
-					//errors = (labels(0,i)==-1.) ? errors : ++errors;
-					if(labels(0,i)==-1.)
-						continue;
-					errors++;
-				}
-			}
-		}
-		return (double)errors;
-	}
+	inline double accuracy(const arma::mat& testbatch, const arma::mat& labels) const;
 	
-	inline arma::mat& getModel() override { return _model; }
-	inline arma::mat* getPModel() override { return &_model; }
-	inline size_t byte_size() const override { return sizeof(double)*(SVs.n_elem+coefs.n_elem); }
-	inline arma::SizeMat modelDimensions() const override { return arma::size(_model); }
-	inline string& getKernel() { return kernel; }
-	inline vector<double>& getKernelParams() { return kernel_params; }
-	inline size_t numberOfSVs() const { return position_set.size(); }
+	// Restore the model using variables from a pre-trained model.
+	inline void restoreModel(const vector<arma::mat*>& params) override;
+	
+	// Retrieve the hidden variables.
+	inline vector<arma::mat*>& getHModel() override;
+	
+	// Get the arma sizes of the model.
+	inline vector<arma::SizeMat> modelDimensions() const override;
+	
+	// The size of the model. Used to calculate the size of the TCP packet.
+	inline size_t byte_size() const override { return sizeof(float)*(K.n_elem+beta.n_elem); }
+
 };
 
 
@@ -365,11 +257,8 @@ public:
 	// Initialize the parameters of the model.
 	void initializeModel(size_t sz) override;
 	
-	// Set the parameters of the model.
-	void update_model(arma::mat w) override;
-	
 	// Update the parameters of the model.
-	void update_model_by_ref(const arma::mat& w) override;
+	void update_model(const vector<arma::mat>& w) override;
 	
 	// Stream update.
 	void fit(const arma::mat& batch, const arma::mat& labels) override;
@@ -378,29 +267,10 @@ public:
 	arma::mat predict(const arma::mat& batch) const override;
 	
 	// Get score.
-	inline double accuracy(const arma::mat& testbatch, const arma::mat& labels) const override{
-		arma::mat predictionTemp;
-		model->Predict(testbatch, predictionTemp);
-		
-		arma::mat prediction = arma::zeros<arma::mat>(1, predictionTemp.n_cols);
-		for(size_t i = 0; i < predictionTemp.n_cols; ++i){
-			prediction(0,i) = arma::as_scalar( arma::find( arma::max(predictionTemp.col(i)) == predictionTemp.col(i), 1) )  +1;
-		}
-		
-		int errors = 0;
-		for(unsigned i = 0; i < prediction.n_cols; ++i){
-			if(labels(0,i) != prediction(0,i)){
-				errors++;
-			}
-		}
-		
-		return (double)errors;
-	}
+	inline double accuracy(const arma::mat& testbatch, const arma::mat& labels) const override;
 	
-	inline arma::mat& getModel() override { return _model; }
-	inline arma::mat* getPModel() override { return &_model; }
-	inline size_t byte_size() const override { return sizeof(double)*(model->Parameters().n_elem); }
-	inline arma::SizeMat modelDimensions() const override { return arma::size(_model); }
+	inline size_t byte_size() const override { return sizeof(float)*(model->Parameters().n_elem); }
+	inline vector<arma::SizeMat> modelDimensions() const override;
 	
 };
 
@@ -425,11 +295,8 @@ public:
 	// Initialize the parameters of the model.
 	void initializeModel(size_t sz) override;
 	
-	// Set the parameters of the model.
-	void update_model(arma::mat w) override;
-	
 	// Update the parameters of the model.
-	void update_model_by_ref(const arma::mat& w) override;
+	void update_model(const vector<arma::mat>& w) override;
 	
 	// Stream update.
 	void fit(const arma::mat& point, const arma::mat& labels) override;
@@ -449,10 +316,8 @@ public:
 		return std::sqrt(RMSE);
 	}
 	
-	inline arma::mat& getModel() override { return _model; }
-	inline arma::mat* getPModel() override { return &_model; }
-	inline size_t byte_size() const override { return sizeof(double)*(W.n_elem); }
-	inline arma::SizeMat modelDimensions() const override { return arma::size(_model); }
+	inline vector<arma::SizeMat> modelDimensions() const override;
+	inline size_t byte_size() const override { return sizeof(float)*(W.n_elem); }
 	
 };
 
@@ -472,10 +337,11 @@ protected:
 	size_t maxIterations; /** The maximum number of points that are processed by the selected optimizer
 						  (i.e., one iteration equals one point; one iteration does not equal one pass over the dataset). */
 	double tolerance; // The tolerance parameter of the selected optimizer.
+	size_t batch_size; // The batch size.
 	
 	vector<int> layer_size; // A vector where each value refers to the number of neurons of the corresponing hidden layer.
 	vector<string> layer_activation; // The activation function of the corresponding hidden layer.
-	Adam* opt; // The Adam optimizer.
+	SGD<AdamUpdate>* opt; // The Adam optimizer.
 	
 public:
 
@@ -484,11 +350,8 @@ public:
 	// Initialize the parameters of the model.
 	void initializeModel(size_t sz) override;
 	
-	// Set the parameters of the model.
-	void update_model(arma::mat w) override;
-	
 	// Update the parameters of the model.
-	void update_model_by_ref(const arma::mat& w) override;
+	void update_model(const vector<arma::mat>& w) override;
 	
 	// Stream update
 	void fit(const arma::mat& batch, const arma::mat& labels) override;
@@ -497,25 +360,10 @@ public:
 	arma::mat predict(const arma::mat& batch) const override;
 	
 	// Get score
-	inline double accuracy(const arma::mat& test_data, const arma::mat& labels) const override{
-		arma::mat prediction;
-		model->Predict(test_data, prediction);
-		
-		// Calculate accuracy RMSE.
-		double RMSE = 0;
-		for(size_t i=0;i<labels.n_cols;i++){
-			RMSE += std::pow( labels(0,i) - prediction(0,i) , 2);
-		}
-		cout << endl << "(RMSE*T)^2 = " << RMSE << endl;
-		RMSE /= labels.n_cols;
-		
-		return std::sqrt(RMSE);
-	}
-	
-	inline arma::mat& getModel() override { return model->Parameters(); }
-	inline arma::mat* getPModel() override { return &model->Parameters(); }
-	inline size_t byte_size() const override { return sizeof(double)*(model->Parameters().n_elem); }
-	inline arma::SizeMat modelDimensions() const override { return arma::size(model->Parameters()); }
+	inline double accuracy(const arma::mat& test_data, const arma::mat& labels) const override;
+
+	inline vector<arma::SizeMat> modelDimensions() const override;
+	inline size_t byte_size() const override { return sizeof(float)*(model->Parameters().n_elem); }
 	
 };
 
@@ -534,7 +382,7 @@ class LeNet : public DLIB_Learner<feats,lbs> {
 	typedef std::vector<lbs> input_labels;
 	
 	using trnet = loss_multiclass_log<relu<fc<10,
-								  dropout<relu<fc<1024,
+								  dropout<relu<fc<256,
 								  max_pool<2,2,2,2,
 								  relu<add_layer<con_<64,5,5,1,1,2,2>,
 								  max_pool<2,2,2,2,
@@ -544,7 +392,8 @@ class LeNet : public DLIB_Learner<feats,lbs> {
 public:
 	
 	// Default constructor.
-	LeNet() { 
+	LeNet(string nodeName)
+	:synchFileID(nodeName) {
 		this->numberOfUpdates=0; 
 		this->num_of_params=0; 
 		initializeTrainer(); 
@@ -573,7 +422,7 @@ public:
 	// Make a prediction.
 	input_labels predict(const input_features& point) override;
 	
-	// Print the architecture of the LeNEt network.
+	// Print the architecture of the LeNet network.
 	void printNet();
 	
 	// Method for calculating the accuracy of the network.
@@ -583,9 +432,7 @@ public:
 	void Synch();
 	
 	// Set the parameters of the model.
-	//void update_model(const resizable_tensor& w) override;
 	void update_model(const vector<resizable_tensor>& w) override;
-	
 	void update_model(const vector<resizable_tensor*>& w) override;
 	
 	// Get the netwoks' parameters.
@@ -597,24 +444,27 @@ public:
 	// Get the LeNet network.
 	auto& Model();
 	
+	// Get the number of the learnable parameters.
 	inline size_t modelDimensions() override { return this->num_of_params; }
 	
 protected:
 	trnet net; // The LeNet network.
 	dnn_trainer<trnet,adam>* trainer; // The adam trainer.
-	size_t maxIterations;
-	tensor* par_fc2; // The parameters of the second fully connected hidden layer.
-	tensor* par_fc1; // The parameters of the first fully connected hidden layer.
-	tensor* par_conv2; // The parameters of the second convolutional layer.
+	size_t maxIterations; // The number of times each batch is fitted.
 	tensor* par_conv1; // The parameters of the first convolutional layer.
+	tensor* par_conv2; // The parameters of the second convolutional layer.
+	tensor* par_fc1; // The parameters of the first fully connected hidden layer.
+	tensor* par_fc2; // The parameters of the second fully connected hidden layer.
+	string synchFileID; // Node name to be used by the optimizer for thread synchronization.
 };
 
 template<typename feats, typename lbs>
 void LeNet<feats,lbs>::initialize_size(){
-	if(this->num_of_params!=0){
+	if(this->num_of_params==0){
 		for(auto layer:this->parameters){
 			this->num_of_params+=layer->size();
 		}
+		cout << "The CNN has " << this->num_of_params << " learnable parameters." << endl;
 	}
 }
 	
@@ -625,7 +475,7 @@ void LeNet<feats,lbs>::initializeTrainer(){
 	trainer->set_learning_rate(1e-4);
     trainer->set_min_learning_rate(1e-4);
 	trainer->set_learning_rate_shrink_factor(1.);
-	maxIterations=1;
+	maxIterations = 1;
 }
 
 template<typename feats, typename lbs>
@@ -679,39 +529,12 @@ void LeNet<feats,lbs>::Synch(){
 	trainer->get_net();
 }
 
-/*
-template<typename feats, typename lbs>
-void LeNet<feats,lbs>::update_model(const resizable_tensor& w){
-	initializeParameterVisitors();
-	size_t counter=0;
-	assert(initialized());
-	for(size_t i=0;i<par_conv1->size();i++){		
-		par_conv1->host()[i]=w.host()[counter];
-		counter++;
-	}
-	assert(counter==par_conv1->size());
-	for(size_t i=0;i<par_conv2->size();i++){		
-		par_conv2->host()[i]=w.host()[counter];
-		counter++;
-	}
-	assert(counter==par_conv2->size()+par_conv1->size());
-	for(size_t i=0;i<par_fc1->size();i++){		
-		par_fc1->host()[i]=w.host()[counter];
-		counter++;
-	}
-	assert(counter==par_fc1->size()+par_conv2->size()+par_conv1->size());
-	for(size_t i=0;i<par_fc2->size();i++){		
-		par_fc2->host()[i]=w.host()[counter];
-		counter++;
-	}
-	assert(counter==this->num_of_params);
-}
-*/
-
 template<typename feats, typename lbs>
 void LeNet<feats,lbs>::update_model(const vector<resizable_tensor>& w){
 	for(size_t i=0;i<w.size();i++){
-		dlib:memcpy(*this->parameters.at(i),w.at(i));
+		//dlib:memcpy(*this->parameters.at(i), w.at(i));
+		//dlib::cpu::affine_transform(*this->parameters.at(i), w.at(i), 1., 0.);
+		dlib::cuda::affine_transform(*this->parameters.at(i), w.at(i), 1.);
 	}
 	initialize_size();
 }
@@ -719,7 +542,9 @@ void LeNet<feats,lbs>::update_model(const vector<resizable_tensor>& w){
 template<typename feats, typename lbs>
 void LeNet<feats,lbs>::update_model(const vector<resizable_tensor*>& w){
 	for(size_t i=0;i<w.size();i++){
-		dlib:memcpy(*this->parameters.at(i),*w.at(i));
+        //dlib:memcpy(*this->parameters.at(i), *w.at(i));
+		//dlib::cpu::affine_transform(*this->parameters.at(i), *w.at(i), 1., 0.);
+		dlib::cuda::affine_transform(*this->parameters.at(i), *w.at(i), 1.);
 	}
 	initialize_size();
 }
@@ -727,29 +552,6 @@ void LeNet<feats,lbs>::update_model(const vector<resizable_tensor*>& w){
 template<typename feats, typename lbs>
 vector<tensor*>& LeNet<feats,lbs>::Parameters(){
 	return this->parameters;
-	/*
-	size_t counter = 0;
-	for(auto it=par_conv1->begin();it!=par_conv1->end();++it){
-		parameters.host()[counter]=*it;
-		counter++;
-	}
-	assert(counter==par_conv1->size());
-	for(auto it=par_conv2->begin();it!=par_conv2->end();++it){
-		parameters.host()[counter]=*it;
-		counter++;
-	}
-	assert(counter==par_conv1->size()+par_conv2->size());
-	for(auto it=par_fc1->begin();it!=par_fc1->end();++it){
-		parameters.host()[counter]=*it;
-		counter++;
-	}
-	assert(counter==par_conv1->size()+par_conv2->size()+par_fc1->size());
-	for(auto it=par_fc2->begin();it!=par_fc2->end();++it){
-		parameters.host()[counter]=*it;
-		counter++;
-	}
-	assert(counter==num_of_params);
-	*/
 }
 
 template<typename feats, typename lbs>

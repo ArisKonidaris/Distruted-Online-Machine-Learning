@@ -31,13 +31,13 @@ template<typename feat, typename lb>
 struct learning_node_proxy;
 
 template<typename feat,typename lb>
-struct network : dl_gm_learning_network<feat, lb, network, coordinator, learning_node>{	
-	network(const set<source_id>& _hids, const string& _name, dl_continuous_query<feat,lb>* _Q);
+struct GM_Net : dl_gm_learning_network<feat, lb, GM_Net, coordinator, learning_node>{	
+	GM_Net(const set<source_id>& _hids, const string& _name, dl_continuous_query<feat,lb>* _Q);
 };
 
 template<typename feat,typename lb>
-network<feat,lb>::network(const set<source_id>& _hids, const string& _name, dl_continuous_query<feat,lb>* _Q)
-: dl_gm_learning_network<feat, lb, network, coordinator, learning_node>(_hids, _name, _Q){
+GM_Net<feat,lb>::GM_Net(const set<source_id>& _hids, const string& _name, dl_continuous_query<feat,lb>* _Q)
+: dl_gm_learning_network<feat, lb, GM_Net, coordinator, learning_node>(_hids, _name, _Q){
 	this->set_protocol_name("LD_GM");
 }
 
@@ -49,7 +49,7 @@ struct coordinator : process
 	typedef coordinator<feature_t,label_t> coordinator_t;
 	typedef learning_node<feature_t,label_t> node_t;
 	typedef learning_node_proxy<feature_t,label_t> node_proxy_t;
-	typedef network<feature_t,label_t> network_t;
+	typedef GM_Net<feature_t,label_t> network_t;
 
 	proxy_map<node_proxy_t, node_t> proxy;
 
@@ -65,7 +65,6 @@ struct coordinator : process
 
 	// index the nodes
 	map<node_t*, size_t> node_index;
-	map<node_t*, size_t> node_proc_points;
 	vector<node_t*> node_ptr;
 
 	coordinator(network_t* nw, dl_continuous_query<feature_t, label_t>* _Q); 
@@ -95,11 +94,6 @@ struct coordinator : process
 	
 	// Get the communication statistics of experiment.
 	vector<size_t> Statistics() const;
-
-	resizable_tensor computeGlobalModel(const resizable_tensor& Param);
-
-	// remote call on warmed up host
-	//oneway end_warmup(sender<node_t> ctx);
 	
 	// Warming up the coordinator.
 	void warmup(std::vector<matrix<feat>>& batch, std::vector<lb>& labels);
@@ -108,19 +102,22 @@ struct coordinator : process
 	void end_warmup();
 
 	// remote call on host violation
-	oneway local_violation(sender<node_t> ctx,  dl_model_state up);
+	oneway local_violation(sender<node_t> ctx,  dl_model_state<tensor> up);
 	
 	set<node_t*> B;					 // initialized by local_violation(), 
 								     // updated by rebalancing algo
 
 	set<node_t*> Bcompl;		     // complement of B, updated by rebalancing algo
 	
-	vector<resizable_tensor*> Mean;   // Used to compute the mean model
+	vector<resizable_tensor*> Mean;  // Used to compute the mean model
 	size_t num_violations;           // Number of violations in the same round (for rebalancing)
+
+	int cnt;                         // Helping counter.
 
 	// statistics
 	size_t num_rounds;				 // total number of rounds
 	size_t num_subrounds;			 // total number of subrounds
+	size_t num_rebalances;           // total number of rebalances
 	size_t sz_sent;					 // total safe zones sent
  	size_t total_updates;		     // number of stream updates received
 
@@ -135,40 +132,24 @@ void coordinator<feat,lb>::start_round(){
 	num_rounds++;
 }
 
-/*
 template<typename feat,typename lb>
-oneway coordinator<feat,lb>::end_warmup(sender<node_t> ctx){
-	node_t* n = ctx.value;
-	fetch_updates(n);
-	B.insert(n);
-	if(B.size()==k){
-		for(auto layer:Mean){
-			dlib::cuda::affine_transform(*layer,*layer,(float)std::pow(k,-1));
-		}
-		//Mean/=(float)k;
-		B.clear();
-		query->update_estimate(Mean);
-		global_learner->update_model(Mean);
-		start_round();
-	}
-}*/
-
-template<typename feat,typename lb>
-oneway coordinator<feat,lb>::local_violation(sender<node_t> ctx, dl_model_state up){
+oneway coordinator<feat,lb>::local_violation(sender<node_t> ctx, dl_model_state<tensor> up){
 	
 	node_t* n = ctx.value;
 	num_violations++;
 	
 	B.clear(); // Clear the balanced nodes set.
 	for(auto layer:Mean){ // Clear the mean global model.
-		dlib::cuda::affine_transform(*layer,*layer,0.);//Mean=0.; // Clear the mean global model.
+		//dlib::cpu::affine_transform(*layer, *layer, 0., 0.); // Clear the mean global model.
+		dlib::cuda::affine_transform(*layer, *layer, 0.); // Clear the mean global model.
 	}
+	cnt = 1;
 	
 	for(size_t i=0;i<up._model.size();i++){
+		//dlib::cpu::add(*Mean.at(i),*Mean.at(i),*up._model.at(i));
 		dlib::cuda::add(1.,*Mean.at(i),1.,*up._model.at(i));
 	}
 	total_updates += up.updates;
-	node_proc_points[n] += up.updates;
 	
 	if( dl_safezone_function* entity = dynamic_cast<Batch_safezone_function*>(safe_zone) ){
 		num_violations = 0;
@@ -183,48 +164,17 @@ oneway coordinator<feat,lb>::local_violation(sender<node_t> ctx, dl_model_state 
 	}
 }
 
-/*
 template<typename feat,typename lb>
 void coordinator<feat,lb>::fetch_updates(node_t* node){
-	dl_model_state up = proxy[node].get_drift();
-	if(query->GlobalModel.size()==0){
-		size_t sz=0;
-		for(auto layer:up._model){
-			sz+=layer->size();
-		}
-		query->initializeGlobalModel(sz);
-		Mean.set_size(sz,1,1,1);
-		Mean=0.;
-	}
-	size_t sz=0;
-	for(auto layer:up._model){
-		for(size_t i=0;i<layer->size();i++){
-			Mean.host()[sz]+=layer->host()[i];
-			sz++;
+	dl_model_state<tensor> up = proxy[node].get_drift();
+	if( std::abs(safe_zone->checkIfAdmissible(up._model)-safe_zone->hyperparameters.at(0)) > 1e-6 ){
+		cnt++;
+		for(size_t i=0;i<up._model.size();i++){
+			//dlib::cpu::add(*Mean.at(i), *Mean.at(i), *up._model.at(i));
+			dlib::cuda::add(1.,*Mean.at(i),1.,*up._model.at(i));
 		}
 	}
 	total_updates += up.updates;
-}
-*/
-
-template<typename feat,typename lb>
-void coordinator<feat,lb>::fetch_updates(node_t* node){
-	dl_model_state up = proxy[node].get_drift();
-	if(query->GlobalModel.size()==0){
-		query->initializeGlobalModel(up._model);
-		for(auto layer:up._model){
-			resizable_tensor* l;
-			l=new resizable_tensor();
-			l->set_size(layer->num_samples(),layer->k(),layer->nr(),layer->nc());
-			*l=0.;
-			Mean.push_back(l);
-		}
-	}
-	for(size_t i=0;i<up._model.size();i++){
-		dlib::cuda::add(1.,*Mean.at(i),1.,*up._model.at(i));
-	}
-	total_updates += up.updates;
-	node_proc_points[node] += up.updates;
 }
 
 // initialize a new round
@@ -237,7 +187,8 @@ void coordinator<feat,lb>::finish_round(node_t* nf) {
 			fetch_updates(n);
 	}
 	for(auto layer:Mean){
-		dlib::cuda::affine_transform(*layer,*layer,(float)std::pow(k,-1)); //Mean /= (float)k;
+		//dlib::cpu::affine_transform(*layer, *layer, std::pow(cnt,-1), 0.);
+		dlib::cuda::affine_transform(*layer, *layer, std::pow(cnt,-1));
 	}
 
 	// New round
@@ -279,22 +230,21 @@ void coordinator<feat,lb>::Kamp_Rebalance(node_t* lvnode){
 		fetch_updates(n);
 		B.insert(n);
 		for(auto layer:Mean){
-			dlib::cuda::affine_transform(*layer,*layer,(float)std::pow(B.size(),-1));
+			//dlib::cpu::affine_transform(*layer, *layer, std::pow(cnt,-1), 0.);
+			dlib::cuda::affine_transform(*layer, *layer, std::pow(cnt, -1));
 		}
-		//Mean /=(float)B.size();
 		if(safe_zone->checkIfAdmissible(Mean) > 0. || B.size() == k )
 			break;
 		for(auto layer:Mean){
-			dlib::cuda::affine_transform(*layer,*layer,(float)B.size());
+			//dlib::cpu::affine_transform(*layer, *layer, cnt, 0.);
+			dlib::cuda::affine_transform(*layer, *layer, cnt);
 		}
-		//Mean *=(float)B.size();
 	}
 	
 	if(B.size() < k){ 
 		// Rebalancing
 		for(auto n : B) {
 			proxy[n].set_drift(tensor_message(Mean, 0));
-			//proxy[n].set_drift(dl_model_state(Mean, 0));
 		}
 		num_subrounds++;
 	}else{
@@ -338,7 +288,6 @@ void coordinator<feat,lb>::finish_rounds(){
 	for(auto n:node_ptr){
 		size_t updates = n->_learner->getNumOfUpdates();
 		total_updates += updates;
-		node_proc_points[n] += updates;
 	}
 	
 	// Print the results.
@@ -358,6 +307,7 @@ vector<size_t>  coordinator<feat,lb>::Statistics() const{
 	vector<size_t> stats;
 	stats.push_back(num_rounds);
 	stats.push_back(num_subrounds);
+	stats.push_back(num_rebalances);
 	stats.push_back(sz_sent);
 	return stats;
 }
@@ -368,7 +318,6 @@ void coordinator<feat,lb>::setup_connections(){
 	proxy.add_sites(net()->sites);
 	for(auto n : net()->sites) {
 		node_index[n] = node_ptr.size();
-		node_proc_points[n]=0;
 		node_ptr.push_back(n);
 	}
 	k = node_ptr.size();
@@ -383,9 +332,9 @@ void coordinator<feat,lb>::warmup(std::vector<matrix<feat>>& batch, std::vector<
 		query->initializeGlobalModel(global_learner->Parameters());
 		for(auto layer:global_learner->Parameters()){
 			resizable_tensor* l;
-			l=new resizable_tensor();
+			l = new resizable_tensor();
 			l->set_size(layer->num_samples(),layer->k(),layer->nr(),layer->nc());
-			*l=0.;
+			*l = 0.;
 			Mean.push_back(l);
 		}
 	}
@@ -394,7 +343,9 @@ void coordinator<feat,lb>::warmup(std::vector<matrix<feat>>& batch, std::vector<
 template<typename feat,typename lb>
 void coordinator<feat,lb>::end_warmup(){
 	for(size_t i=0;i<Mean.size();i++){
-		dlib:memcpy(*Mean.at(i),*global_learner->Parameters().at(i));
+		//dlib:memcpy(*Mean.at(i), *global_learner->Parameters().at(i));
+		//dlib::cpu::affine_transform(*Mean.at(i), *global_learner->Parameters().at(i), 1., 0.);
+		dlib::cuda::affine_transform(*Mean.at(i), *global_learner->Parameters().at(i), 1.);
 	}
 	query->update_estimate(Mean);
 	start_round();
@@ -403,7 +354,7 @@ void coordinator<feat,lb>::end_warmup(){
 template<typename feat,typename lb>
 void coordinator<feat,lb>::initializeLearner(){
 	if (cfg().learning_algorithm == "LeNet"){
-		global_learner = new LeNet<feature_t,label_t>();
+		global_learner = new LeNet<feature_t,label_t>(this->name());
 		
 		std::vector<matrix<feature_t>> random_image_init;
 		std::vector<label_t> random_label_init;
@@ -417,6 +368,7 @@ void coordinator<feat,lb>::initializeLearner(){
 		random_label_init.push_back((label_t)1);
 		global_learner->fit(random_image_init,random_label_init);
 	}
+	cout << "Synchronizer " << this->name() << " initialized its network." << endl;
 }
 
 template<typename feat,typename lb>
@@ -424,7 +376,7 @@ coordinator<feat,lb>::coordinator(network_t* nw, dl_continuous_query<feat,lb>* _
 : 	process(nw), proxy(this),
 	Q(_Q),
 	k(0),
-	num_violations(0), num_rounds(0), num_subrounds(0),
+	num_violations(0), num_rounds(0), num_subrounds(0), num_rebalances(0),
 	sz_sent(0), total_updates(0){
 	initializeLearner();
 	query = Q->create_query_state();
@@ -442,7 +394,6 @@ struct coord_proxy : remote_proxy<coordinator<feat,lb>>
 {
 	using coordinator_t = coordinator<feat,lb>;
 	REMOTE_METHOD(coordinator_t, local_violation);
-	//REMOTE_METHOD(coordinator_t, end_warmup);
 	coord_proxy(process* c) : remote_proxy<coordinator_t>(c) { } 
 };
 
@@ -459,12 +410,12 @@ struct learning_node : local_site {
 	typedef coordinator<feature_t, label_t> coordinator_t;
 	typedef learning_node<feature_t, label_t> node_t;
 	typedef learning_node_proxy<feature_t, label_t> node_proxy_t;
-	typedef network<feature_t, label_t> network_t;
+	typedef GM_Net<feature_t, label_t> network_t;
 	typedef coord_proxy<feature_t, label_t> coord_proxy_t;
     typedef dl_continuous_query<feature_t, label_t> continuous_query_t;
 
-    continuous_query_t* Q;                  // The query management object.
-    dl_safezone szone;                       // The safezone object.
+    continuous_query_t* Q;               // The query management object.
+    dl_safezone szone;                   // The safezone object.
 	DLIB_Learner<feat,lb>* _learner;
 
 	int num_sites;			             // Number of sites.
@@ -494,11 +445,9 @@ struct learning_node : local_site {
 	oneway reset(const dl_safezone& newsz); 
 
 	// transfer data to the coordinator
-	dl_model_state get_drift();
+	dl_model_state<tensor> get_drift();
 	
-	// set the drift vector (for rebalancing)
 	void set_drift(tensor_message mdl);
-	//void set_drift(dl_model_state mdl);
 	
 };
 
@@ -510,9 +459,9 @@ oneway learning_node<feat,lb>::reset(const dl_safezone& newsz){
 }
 
 template<typename feat,typename lb>
-dl_model_state learning_node<feat,lb>::get_drift(){
+dl_model_state<tensor> learning_node<feat,lb>::get_drift(){
 	// Getting the drift vector is done as getting the local statistic
-	return dl_model_state(_learner->Parameters(), _learner->getNumOfUpdates());
+	return dl_model_state<tensor>(_learner->Parameters(), _learner->getNumOfUpdates());
 }
 
 template<typename feat,typename lb>
@@ -528,22 +477,23 @@ void learning_node<feat,lb>::update_stream(std::vector<matrix<feature_t>>& batch
 	datapoints_seen += batch.size();
 	
 	if( dl_safezone_function* entity = dynamic_cast<Param_Variance_safezone_func*>(szone.getSZone()) ){
-		if(szone(datapoints_seen) <= 0.){
+		//size_t ch = szone(datapoints_seen);
+		if(szone(datapoints_seen) <= 0){
 			datapoints_seen = 0;
 			if(szone(_learner->Parameters())<0.){
-				coord.local_violation(this, dl_model_state(_learner->Parameters(), _learner->getNumOfUpdates()));
+				coord.local_violation(this, dl_model_state<tensor>(_learner->Parameters(), _learner->getNumOfUpdates()));
 			}
 		}
 	}else{
 		if(szone(datapoints_seen) <= 0.)
-			coord.local_violation(this, dl_model_state(_learner->Parameters(), _learner->getNumOfUpdates()));
+			coord.local_violation(this, dl_model_state<tensor>(_learner->Parameters(), _learner->getNumOfUpdates()));
 	}
 }
 
 template<typename feat,typename lb>
 void learning_node<feat,lb>::initializeLearner(){
 	if (cfg().learning_algorithm == "LeNet"){
-		_learner = new LeNet<feature_t,label_t>();
+		_learner = new LeNet<feature_t,label_t>(this->name());
 		
 		std::vector<matrix<feature_t>> random_image_init;
 		std::vector<label_t> random_label_init;
@@ -558,26 +508,13 @@ void learning_node<feat,lb>::initializeLearner(){
 		_learner->fit(random_image_init,random_label_init);
 		_learner->getNumOfUpdates();
 	}
-	
+	cout << "Local site " << this->name() << " initialized its network." << endl;
 }
 
 template<typename feat,typename lb>
 void learning_node<feat,lb>::setup_connections(){
 	num_sites = coord.proc()->k;
 }
-
-/*
-template<typename feat,typename lb>
-void learning_node<feat,lb>::warmup(std::vector<matrix<feature_t>>& batch, std::vector<label_t>& labels){
-	_learner->fit(batch,labels);
-}
-
-
-template<typename feat,typename lb>
-void learning_node<feat,lb>::end_warmup(){
-	coord.end_warmup(this);
-}
-*/
 
 template<typename feat,typename lb>
 struct learning_node_proxy : remote_proxy< learning_node<feat,lb> >

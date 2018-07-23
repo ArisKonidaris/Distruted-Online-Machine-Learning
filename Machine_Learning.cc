@@ -45,26 +45,18 @@ void PassiveAgressiveClassifier::initializeModel(size_t sz){
 	// Initialize the parameter vector W.
 	W = arma::zeros<arma::dvec>(sz);
 	intercept = 0.;
-	_model = arma::mat(&W(0), W.n_rows+1, 1, false);
+	//_model = arma::mat(&W(0), W.n_rows+1, 1, false);
+	arma::mat* _model = new arma::mat(&W(0), W.n_rows+1, 1, false);
+	vector_model.push_back(_model);
 }
 
-void PassiveAgressiveClassifier::update_model(arma::mat w){
-	for(size_t i = 0; i < w.n_rows; i++){
-		if(i<w.n_rows-1){
-			W.row(i) = w.row(i);
+void PassiveAgressiveClassifier::update_model(const vector<arma::mat>& w){
+	assert(w.size()==1);
+	for(size_t i = 0; i < w.at(0).n_rows; i++){
+		if(i<w.at(0).n_rows-1){
+			W.row(i) = w.at(0).row(i);
 		}else{
-			intercept = w.row(i)(0);
-		}
-	}
-}
-
-void PassiveAgressiveClassifier::update_model_by_ref(const arma::mat& w){
-	//W -= W - w.unsafe_col(0);
-	for(size_t i = 0; i < w.n_rows; i++){
-		if(i<w.n_rows-1){
-			W.row(i) = w.row(i);
-		}else{
-			intercept = w.row(i)(0);
+			intercept = w.at(0).row(i)(0);
 		}
 	}
 }
@@ -98,7 +90,7 @@ void PassiveAgressiveClassifier::fit(const arma::mat& batch, const arma::mat& la
 		W += Lagrange_Muliplier*labels(0,i)*batch.unsafe_col(i);
 		intercept += Lagrange_Muliplier*labels(0,i);
 	}
-	numberOfUpdates+=batch.n_cols;
+	numberOfUpdates += batch.n_cols;
 }
 
 arma::mat PassiveAgressiveClassifier::predict(const arma::mat& batch) const {
@@ -113,282 +105,159 @@ arma::mat PassiveAgressiveClassifier::predict(const arma::mat& batch) const {
 	return prediction;
 }
 
+inline vector<arma::mat*>& PassiveAgressiveClassifier::getModel(){
+	(*vector_model.at(0))(vector_model.at(0)->n_rows-1, 0) = intercept;
+	return vector_model;
+}
+
+inline vector<arma::SizeMat> PassiveAgressiveClassifier::modelDimensions() const{
+	vector<arma::SizeMat> dims;
+	dims.push_back(arma::size(*vector_model.at(0)));
+	return dims; 
+}
 
 /*********************************************
-	Kernel Passive Aggressive Classifier
+	Extreme Learning Machine Classifier
 *********************************************/
 
-KernelPassiveAgressiveClassifier::KernelPassiveAgressiveClassifier(string cfg, string net_name)
-:MLPACK_Learner() {
+ELM_Classifier::ELM_Classifier(string cfg, string net_name)
+:MLPACK_Learner(){
 	try{
-		
 		std::ifstream cfgfile(cfg);
 		cfgfile >> root;
-		
-		time_seed = (long int)root[root["gm_network_"+net_name]
-							   .get("parameters_of_learner","NoParams").asString()]
-		                       .get("seed",0).asInt64();
-		if(time_seed < 0){
-			seed = time(&time_seed);
-			std::srand (seed);
-		}else{
-			std::srand (time_seed);
-		}
-		
-		kernel = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
-					 .get("kernel","No Kernel given").asString();
-		if(kernel!="poly" && kernel!="rbf"){
-			cout << endl << "Invalid kernel given." << endl;
-			cout << "Valid kernels [\"rbf\",\"poly\"] ." << endl;
-			throw;
-		}
-		if(kernel=="rbf"){
-			double gamma = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
-						   .get("gamma",-1).asDouble();
-			if(gamma<=0.){
-				cout << endl << "Invalid gamma given." << endl;
-				cout << "Sigma must be a positive double." << endl;
-				cout << "Sigma is set to 0.5 by default" << endl;
-				kernel_params.push_back(0.5);
-			}else{
-				kernel_params.push_back(gamma);
-			}
-		}else if(kernel=="poly"){
-			int degree = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
-						 .get("degree",-1).asInt();
-			double offset = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
-			                .get("offset",1e-20).asDouble();
-			if(degree<=0 && offset!=1e-20){
-				cout << endl << "Invalid degree given." << endl;
-				cout << "Degree must be a positive integer." << endl;
-				cout << "Sigma is set to 2.0 by default" << endl;
-				kernel_params.push_back(2);
-				kernel_params.push_back(offset);
-			}else if(degree>0 && offset==1e-20){
-				cout << endl << "Offset id 0.0 by default" << endl;
-				kernel_params.push_back(degree);
-				kernel_params.push_back(0.);
-			}else if(degree<=0 && offset==1e-20){
-				cout << endl << "Invalid degree given." << endl;
-				cout << "Degree must be a positive integer." << endl;
-				cout << "Sigma is set to 2.0 by default" << endl;
-				cout << endl << "Offset id 0.0 by default" << endl;
-				kernel_params.push_back(2);
-				kernel_params.push_back(0.);
-			}else{
-				kernel_params.push_back(degree);
-				kernel_params.push_back(offset);
-			}
-		}
-		
-		regularization = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
-						.get("regularization","Incorrect regularization parameter").asString();
-		if(regularization=="Incorrect regularization parameter" ||
-		   (regularization!="none" &&
-			regularization!="l1" &&
-			regularization!="l2")){
-			cout << endl << "Incorrect regularization parameter." << endl;
-			cout << "Acceptable regularization parameters : ['none','l1','l2']" << endl;
-			throw;
-		}
-		if(regularization!="none"){
-			C = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
-			    .get("C",-1).asDouble();
-			if(C<0){
-				cout << endl << "Incorrect parameter C." << endl;
-				cout << endl << "Acceptable C parameters : [positive double]" << endl;
-				throw;
-			}
-		}
-		
-		double alpha = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
-					   .get("a",-1.).asDouble();
-		double beta = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
-		              .get("b",-1.).asDouble();
-		if(alpha<=0.){
-			cout << endl << "Invalid parameter a." << endl;
-			cout << "Parameter a must be a positive double." << endl;
-			throw;
-		}
-		if(beta<=0.){
-			cout << endl << "Invalid parameter b." << endl;
-			cout << "Parameter b must be a positive double." << endl;
-			throw;
-		}
-		if(alpha>beta){
-			cout << endl << "Invalid parameters a and b.";
-			cout << "Parameter b cannot be bigger that a." << endl;
-			throw;
-		}
-		a=alpha;
-		b=beta;
-		
-		int mSVs = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
-		           .get("maxSVs",-1).asInt64();
-		if(mSVs<=0){
-			cout << endl << "Invalid parameter maxSVs." << endl;
-			cout << "The parameter maxSVs must be a positive integer." << endl;
-			throw;
-		}
-		maxSVs = mSVs;
+		num_of_neurons = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
+						.get("neurons",0).asInt();
 		numberOfUpdates = 0;
 	}catch(...){
 		throw;
 	}
 }
 
-void KernelPassiveAgressiveClassifier::initializeModel(size_t sz) {
-	// Initialize the parameter vector W.
-	_model = arma::zeros<arma::mat>(maxSVs,sz+2);
+void ELM_Classifier::initializeModel(size_t num_of_feats, size_t num_of_classes){
+	A = 2.*arma::randu<arma::mat>(num_of_feats, num_of_neurons)-1.;
+	b = 2.*arma::randu<arma::mat>(1, num_of_neurons)-1.;
+	hidden_parameters.push_back(&A);
+	hidden_parameters.push_back(&b);
+	
+	K = arma::zeros<arma::mat>(num_of_neurons, num_of_neurons);
+	beta = arma::zeros<arma::mat>(num_of_neurons, num_of_classes);
+	vector_model.push_back(&K);
+	vector_model.push_back(&beta);
 }
 
-void KernelPassiveAgressiveClassifier::update_model(arma::mat w) {
-	_model = w; // Update the model.
-	// Create the red-black tree with the new Support Vectors.
-	if(position_set.size() != 0)
-		position_set.clear();
-	for(size_t i = 0; i < _model.n_rows; i++){
-		if(_model(i,0)!=0.){ // If not true then it means that the num of SVs are still less than the max allowed
-			position_set.insert(SV_index(i,std::abs(_model(i,1))/_model(i,0)));
-		}else{
-			break;
-		}
+void ELM_Classifier::restoreModel(const vector<arma::mat*>& params){
+	hidden_parameters.clear();
+	A = arma::mat(arma::size(*params.at(0)),arma::fill::zeros);
+	for(size_t i=0; i<params.at(0)->n_cols; i++){
+		A.col(i) = params.at(0)->col(i);
 	}
-	updateRefModel();
-}
-
-void KernelPassiveAgressiveClassifier::update_model_by_ref(const arma::mat& w) {
-	// Create the red-black tree with the new Support Vectors.
-	if(position_set.size() != 0)
-		position_set.clear();
-	for(size_t i = 0; i < _model.n_rows; i++){
-		_model.row(i) = w.row(i);
-		if(_model(i,0)!=0.){ // If not true then it means that the num of SVs are still less than the max allowed
-			position_set.insert(SV_index(i,std::abs(_model(i,1))/_model(i,0)));
-		}
+	b = arma::mat(arma::size(*params.at(1)),arma::fill::zeros);
+	for(size_t i=0; i<params.at(1)->n_cols; i++){
+		b.col(i) = params.at(1)->col(i);
 	}
-	updateRefModel();
+	hidden_parameters.push_back(&A);
+	hidden_parameters.push_back(&b);
 }
 
-void KernelPassiveAgressiveClassifier::fit(const arma::mat& batch, const arma::mat& labels) {
-	// Starting the online learning
-	for(size_t i=0; i<batch.n_cols; i++){
-		arma::dvec point = batch.unsafe_col(i);
+void ELM_Classifier::update_model(const vector<arma::mat>& w){
+	vector_model.clear();
+	// In case the learning has not been initialized.
+	if(K.n_elem==0 || beta.n_elem==0){
+		K = arma::mat(arma::size(w.at(0)), arma::fill::zeros);
+		beta = arma::mat(arma::size(w.at(1)), arma::fill::zeros);
+	}
 		
-		double loss;
-		double probability;
-		if(position_set.size()==0){
-			loss = (double)std::rand()/RAND_MAX;
-		}else{
-			// calculate the Hinge loss.
-			loss = 1. - labels(0,i)*this->Margin(point);
-		}
+    // In case of concept drift.
+//	if(beta.n_cols != w.at(1).n_cols)
+//		beta.resize(beta.n_rows, w.at(1).n_cols);
 		
-		// Classified correctly. Parameters stay the same. Passive approach.
-		if (loss <= 0.){
-			continue;
-		}
-			
-		probability = std::min(a,loss)/b;
-		//probability = 1.;
-		if ( (double)std::rand()/RAND_MAX <= probability || position_set.size()==0 ){
-			
-			// Calculate the Lagrange Multiplier.
-			double Lagrange_Multiplier;
-			if(regularization=="none"){
-				Lagrange_Multiplier = loss / HilbertDot(point,point);
-			}else if (regularization=="l1"){
-				Lagrange_Multiplier = std::min( C/probability, loss/HilbertDot(point,point) );
-			}else if (regularization=="l2"){
-				Lagrange_Multiplier = loss / ( HilbertDot(point,point) + probability/(2*C) );
-			}else{
-				//throw exception
-				cout << "throw exception" << endl;
-			}
-			
-			// Keep only the best Support Vectors.
-			if(position_set.size()<maxSVs){
-				std::pair pr = position_set.insert(SV_index(position_set.size(), Lagrange_Multiplier));
-				if(!pr.second)
-					continue;
-				_model(position_set.size()-1,0) = 1.; // Multiplied by...
-				_model(position_set.size()-1,1) = Lagrange_Multiplier*labels(0,i); // The multiplier.
-				_model.row(position_set.size()-1).cols(2, _model.n_cols-1) = batch.col(i).t(); // The SV.
-				updateRefModel();
-				continue;
-			}
-			if(position_set.begin()->La_Mult < Lagrange_Multiplier){
-				// Insert the new row vector in the ordered set.
-				std::pair pr = position_set.insert(SV_index(position_set.begin()->index, Lagrange_Multiplier));
-				if(!pr.second)
-					continue;
-				_model(position_set.begin()->index,0) = 1.; // Multiplied by...
-				_model(position_set.begin()->index,1) = Lagrange_Multiplier*labels(0,i); // The multiplier.
-				_model.row(position_set.begin()->index).cols(2, _model.n_cols-1) = batch.col(i).t(); // The SV.
-				position_set.erase(position_set.begin()); // erase the first(smallest) element from the set.
-				updateRefModel();
-			}
-		}
+	// Update the parameters.
+	for(size_t i = 0; i < w.at(0).n_cols; i++){
+		K.col(i) = w.at(0).col(i);
 	}
-	numberOfUpdates+=batch.n_cols;
+	for(size_t i = 0; i < w.at(1).n_cols; i++){
+		beta.col(i) = w.at(1).col(i);
+	}
+	
+	vector_model.push_back(&K);
+	vector_model.push_back(&beta);
 }
 
-void KernelPassiveAgressiveClassifier::updateRefModel() {
-	if( (position_set.size()<maxSVs) || (position_set.size()==maxSVs && coefs.n_rows<maxSVs) ){
-		coefs = arma::mat(&_model(0,1), position_set.size(), 1, false);
-		SVs = arma::mat(&_model(0,2), _model.n_rows, _model.n_cols-2, false);
-		if(position_set.size()<maxSVs)
-			SVs.shed_rows(position_set.size(), _model.n_rows-1);
-	}
-	for(size_t i = 0; i< coefs.n_rows; i++){
-		assert(_model(i,1)==coefs(i,0));
-		for(size_t j = 0; j< SVs.n_cols; j++){
-			assert(_model(i,j+2)==SVs(i,j));
-		}
-	}
+void ELM_Classifier::handleVD(size_t sz){
+	vector_model.erase(vector_model.begin());
+	arma::mat A_ = 2.*arma::randu<arma::mat>(A.n_rows+sz, num_of_neurons)-1.;
+	A_.rows(0, A.n_rows-1) = A;
+	A = A_;
+	vector_model.insert(vector_model.begin(),&A);
 }
 
-arma::mat KernelPassiveAgressiveClassifier::predict(const arma::mat& batch) const {
-	if(kernel=="poly"){
-		arma::mat predictions = coefs.t()*arma::pow( SVs*batch + kernel_params.at(1), (int)kernel_params.at(0));
-		predictions.transform([](double val){ return (val >= 0.) ? 1.: -1.; } );
-		return predictions;
-	}else{
-		arma::mat prediction = arma::zeros<arma::mat>(1,batch.n_cols);
-		for(size_t i = 0; i < batch.n_cols; i++){
-			arma::dvec point = batch.unsafe_col(i);
-			if( this->Margin(point) >= 0.){
-				prediction(0,i) = 1.;
-			}else{
-				prediction(0,i) = -1.;
-			}
-		}
-		return prediction;
-	}
+void ELM_Classifier::handleRD(size_t sz){
+	vector_model.erase(vector_model.begin()+vector_model.size()-1);
+	arma::mat beta_ = arma::zeros<arma::mat>(num_of_neurons, beta.n_cols+sz);
+	beta_.cols(0, beta.n_cols-1) = beta;
+	beta = beta_;
+	vector_model.push_back(&beta);
 }
 
-double KernelPassiveAgressiveClassifier::Margin(arma::dvec& data_point) const {
-	if(kernel=="poly"){
-		return arma::dot(coefs, arma::pow( SVs*data_point + kernel_params.at(1), (int)kernel_params.at(0)));
-	}else{
-		return arma::dot(coefs,
-						 arma::exp(-kernel_params.at(0)*
-								   (SVs.each_row()-data_point.t())
-								   .each_row( [](arma::drowvec& a){ a(0)=arma::dot(a,a);return a; })
-								   .col(0) 
-								   )
-					    );
-	}
+void ELM_Classifier::fit(const arma::mat& batch, const arma::mat& labels){
+	// Check if the model has not been initialized.
+	if(A.n_elem==0)
+		initializeModel(batch.n_rows, labels.n_rows);
+	
+	// Check for Virtual Drift in the Stream. If True, expand the neurons of the network.
+	if(batch.n_rows>A.n_rows)
+		handleVD(batch.n_rows-A.n_rows);
+		
+	// Check for Real Drift in the Stream. If True, expand the beta parameters of the network.
+	if(labels.n_rows>beta.n_cols)
+		handleRD(labels.n_rows-beta.n_cols);
+	
+	// Fit the data to the network.
+	arma::mat H = batch.t()*A;
+	H = arma::tanh(H.each_row()+b);
+	arma::mat H_T = H.t();
+	K += H_T*H;
+	beta += arma::inv(K)*H_T*(labels.t()-H*beta);
+	
+	numberOfUpdates += batch.n_cols;
 }
 
-double KernelPassiveAgressiveClassifier::HilbertDot(const arma::dvec& data_point1, const arma::dvec& data_point2) const {
-	if(kernel=="poly"){ // Hilbert Product for Polynomial Kernel 
-		return std::pow(arma::dot(data_point1, data_point2) + kernel_params.at(1), (int)kernel_params.at(0));
-	}else{ // Hilbert Product for Gaussian Kernel 
-		return 1.;
+arma::mat ELM_Classifier::predict(const arma::mat& batch) const{
+	
+	arma::mat H = batch.t()*A;
+	H = arma::tanh(H.each_row()+b);
+	arma::mat predictionTemp = H*beta;
+	
+	arma::mat prediction = arma::zeros<arma::mat>(1, predictionTemp.n_rows);
+	for(size_t i=0; i<predictionTemp.n_rows; i++){
+		prediction(0,i) = arma::as_scalar( arma::find( arma::max(predictionTemp.row(i)) == predictionTemp.row(i), 1) );
 	}
+	
+	return prediction;
 }
 
+inline double ELM_Classifier::accuracy(const arma::mat& testbatch, const arma::mat& labels) const{
+	// Calculate accuracy.
+	int errors=0;
+	arma::mat prediction = predict(testbatch);
+	for(size_t i=0; i<labels.n_cols; i++){
+		if(prediction(0,i) != arma::as_scalar( arma::find( arma::max(labels.unsafe_col(i)) == labels.unsafe_col(i), 1) ))
+			errors++;
+	}
+	double score = 100.0*(labels.n_elem-errors)/(labels.n_elem);
+	return score;
+}
+
+inline vector<arma::mat*>& ELM_Classifier::getHModel(){
+	return hidden_parameters;
+}
+
+inline vector<arma::SizeMat> ELM_Classifier::modelDimensions() const{
+	vector<arma::SizeMat> md_size;
+	md_size.push_back(arma::size(*vector_model.at(0)));
+	md_size.push_back(arma::size(*vector_model.at(1)));
+	return md_size; 
+}
 
 /*********************************************
 	Multi Layer Perceptron Classifier
@@ -525,23 +394,19 @@ void MLP_Classifier::initializeModel(size_t sz){
 	model->Add<LogSoftMax<> >();
 	model->ResetParameters();
 	
-	//opt = new SGD<AdamUpdate>(stepSize, batch_size, beta1, beta2, eps, maxIterations, tolerance, false);
 	opt = new SGD<AdamUpdate>(stepSize, batch_size, maxIterations, tolerance);
 	opt->UpdatePolicy() = AdamUpdate(eps, beta1, beta2);
 	opt->ResetPolicy() = false;
 	opt->UpdatePolicy().Initialize(model->Parameters().n_rows, model->Parameters().n_cols);
 	
-	_model = arma::mat(&model->Parameters()(0,0), model->Parameters().n_rows, model->Parameters().n_cols, false);
-
+	arma::mat* _model = new arma::mat(&model->Parameters()(0,0), model->Parameters().n_rows, model->Parameters().n_cols, false);
+	vector_model.push_back(_model);
 }
 
-void MLP_Classifier::update_model(arma::mat w){
-	model->Parameters() = w;
-}
-
-void MLP_Classifier::update_model_by_ref(const arma::mat& w){
-	for(size_t i = 0; i < w.n_cols; i++){
-		model->Parameters().col(i) = w.col(i);
+void MLP_Classifier::update_model(const vector<arma::mat>& w){
+	assert(w.size()==1);
+	for(size_t i = 0; i < w.at(0).n_cols; i++){
+		model->Parameters().col(i) = w.at(0).col(i);
 	}
 }
 
@@ -560,6 +425,32 @@ arma::mat MLP_Classifier::predict(const arma::mat& batch) const {
 	}
 	
 	return prediction;
+}
+
+inline double MLP_Classifier::accuracy(const arma::mat& testbatch, const arma::mat& labels) const {
+	arma::mat predictionTemp;
+	model->Predict(testbatch, predictionTemp);
+	
+	arma::mat prediction = arma::zeros<arma::mat>(1, predictionTemp.n_cols);
+	for(size_t i = 0; i < predictionTemp.n_cols; ++i){
+		prediction(0,i) = arma::as_scalar( arma::find( arma::max(predictionTemp.col(i)) == predictionTemp.col(i), 1) )+1;
+	}
+	
+	int errors = 0;
+	for(unsigned i = 0; i < prediction.n_cols; ++i){
+		if(labels(0,i) != prediction(0,i)){
+			errors++;
+		}
+	}
+	
+	return (double)errors;
+}
+
+inline vector<arma::SizeMat> MLP_Classifier::modelDimensions() const{
+	vector<arma::SizeMat> md_size;
+	for(arma::mat* param:vector_model)
+		md_size.push_back(arma::size(*param));
+	return md_size; 
 }
 
 
@@ -610,15 +501,13 @@ PassiveAgressiveRegression::PassiveAgressiveRegression(string cfg, string net_na
 void PassiveAgressiveRegression::initializeModel(size_t sz){
 	// Initialize the parameter vector W.
 	W = arma::zeros<arma::dvec>(sz);
-	_model = arma::mat(&W(0), W.n_rows, 1, false);
+	arma::mat* _model = new arma::mat(&W(0), W.n_rows, 1, false);
+	vector_model.push_back(_model);
 }
 
-void PassiveAgressiveRegression::update_model(arma::mat w){
-	W = w.col(0);
-}
-
-void PassiveAgressiveRegression::update_model_by_ref(const arma::mat& w){
-	W -= W - w.unsafe_col(0);
+void PassiveAgressiveRegression::update_model(const vector<arma::mat>& w){
+	assert(w.size()==1);
+	W -= W - w.at(0).unsafe_col(0);
 }
 
 void PassiveAgressiveRegression::fit(const arma::mat& batch, const arma::mat& labels){
@@ -660,6 +549,12 @@ arma::mat PassiveAgressiveRegression::predict(const arma::mat& batch) const {
 	return prediction;
 }
 
+inline vector<arma::SizeMat> PassiveAgressiveRegression::modelDimensions() const {
+	vector<arma::SizeMat> md_size;
+	for(arma::mat* param:vector_model)
+		md_size.push_back(arma::size(*param));
+	return md_size;
+}
 
 /*********************************************
 	Neural Network Regressor
@@ -692,6 +587,14 @@ NN_Regressor::NN_Regressor(string cfg, string net_name)
 		if(stepSize <= 0.){
 			cout << endl <<"Invalid parameter stepSize given." << endl;
 			cout << "Parameter stepSize must be a positive double." << endl;
+			throw;
+		}
+		
+		batch_size = root[root["gm_network_"+net_name].get("parameters_of_learner","NoParams").asString()]
+				   .get("batchSize",-1).asInt64();
+		if(batch_size <= 0.){
+			cout << endl <<"Invalid parameter batchSize given." << endl;
+			cout << "Parameter batchSize must be a positive integer." << endl;
 			throw;
 		}
 		
@@ -761,7 +664,6 @@ NN_Regressor::NN_Regressor(string cfg, string net_name)
 			}
 		}
 		numberOfUpdates = 0;
-		opt = new Adam(stepSize, 1, beta1, beta2, eps, maxIterations, tolerance, false);
 	}catch(...){
 		throw;
 	}
@@ -789,21 +691,24 @@ void NN_Regressor::initializeModel(size_t sz){
 	}
 	model->Add<Linear<> >(layer_size.at(layer_size.size()-1), 1);
 	model->ResetParameters();
+	
+	opt = new SGD<AdamUpdate>(stepSize, batch_size, maxIterations, tolerance);
+	opt->UpdatePolicy() = AdamUpdate(eps, beta1, beta2);
+	opt->ResetPolicy() = false;
+	opt->UpdatePolicy().Initialize(model->Parameters().n_rows, model->Parameters().n_cols);
+	
+	arma::mat* _model = new arma::mat(&model->Parameters()(0,0), model->Parameters().n_rows, model->Parameters().n_cols, false);
+	vector_model.push_back(_model);
 }
 
-void NN_Regressor::update_model(arma::mat w){
-	model->Parameters() = w;
-}
-
-void NN_Regressor::update_model_by_ref(const arma::mat& w){
-	model->Parameters() -= model->Parameters() - w;
+void NN_Regressor::update_model(const vector<arma::mat>& w){
+	assert(w.size()==1);
+	for(size_t i = 0; i < w.at(0).n_cols; i++){
+		model->Parameters().col(i) = w.at(0).col(i);
+	}
 }
 
 void NN_Regressor::fit(const arma::mat& batch, const arma::mat& labels){
-	if(batch.n_cols != opt->BatchSize()){
-		delete opt;
-		opt = new Adam( stepSize, batch.n_cols, beta1, beta2, eps, maxIterations, tolerance, false );
-	}
 	model->Train( batch, labels, *opt );
 	numberOfUpdates+=batch.n_cols;
 }
@@ -814,4 +719,24 @@ arma::mat NN_Regressor::predict(const arma::mat& batch) const {
 	return prediction;
 }
 
+inline double NN_Regressor::accuracy(const arma::mat& test_data, const arma::mat& labels) const {
+	arma::mat prediction;
+	model->Predict(test_data, prediction);
+	
+	// Calculate accuracy RMSE.
+	double RMSE = 0;
+	for(size_t i=0;i<labels.n_cols;i++){
+		RMSE += std::pow( labels(0,i) - prediction(0,i) , 2);
+	}
+	cout << endl << "(RMSE*T)^2 = " << RMSE << endl;
+	RMSE /= labels.n_cols;
+	
+	return std::sqrt(RMSE);
+}
 
+inline vector<arma::SizeMat> NN_Regressor::modelDimensions() const {
+	vector<arma::SizeMat> md_size;
+	for(arma::mat* param:vector_model)
+		md_size.push_back(arma::size(*param));
+	return md_size; 
+}

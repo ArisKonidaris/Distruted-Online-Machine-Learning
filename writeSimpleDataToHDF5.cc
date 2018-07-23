@@ -18,32 +18,48 @@ using namespace H5;
 
 //#define NUM_OF_FEATS 100 // Number of features of each data point.
 #define NUM_OF_FEATS 784 // Number of features of each data point.
+//#define NUM_OF_FEATS 928 // Number of features of each data point.
 //#define NUM_OF_FEATS 18 // Number of features of each data point.
 //#define NUM_OF_SMPLS 50 // The number of data points.
 //#define NUM_OF_SMPLS 5000 // The number of data points.
-//#define NUM_OF_SMPLS 10000 // The number of data points.
+#define NUM_OF_SMPLS 10000 // The number of data points.
+//#define NUM_OF_SMPLS 15000 // The number of data points.
+//#define NUM_OF_SMPLS 20000 // The number of data points.
 //#define NUM_OF_SMPLS 60000 // The number of data points.
+//#define NUM_OF_SMPLS 190000 // The number of data points.
 //#define NUM_OF_SMPLS 600000 // The number of data points.
 //#define NUM_OF_SMPLS 1000000 // The number of data points.
-#define NUM_OF_SMPLS 2220000 // The number of data points.
-//#define NUM_OF_SMPLS 5000000 // The number of data points.
+//#define NUM_OF_SMPLS 2200000 // The number of data points.
+//#define NUM_OF_SMPLS 2220000 // The number of data points.
 #define DSET_BUFF_SZ 1000 // The number of data points the buffer contains.
 
 const int BUFFER_SIZE(4<<20); // The size (in bytes) of the file stream buffer.
 
 const int RANK = 2; // Number of dimensions of dataspace.
 const int DATA_SIZE = NUM_OF_FEATS + 2;
-const H5std_string FILE_NAME("TestFile2.h5"); // Name of hdf5 file.
+const H5std_string FILE_NAME("Experimental_Datasets.h5"); // Name of hdf5 file.
 //const H5std_string DATASET_NAME("Linear50"); // Name of dataset.
 //const H5std_string DATASET_NAME("Linear5000"); // Name of dataset.
 //const H5std_string DATASET_NAME("Linear600000"); // Name of dataset.
 //const H5std_string DATASET_NAME("Linear1000000"); // Name of dataset.
 //const H5std_string DATASET_NAME("MNIST_train"); // Name of dataset.
-const H5std_string DATASET_NAME("AMNIST_train"); // Name of dataset.
-//const H5std_string DATASET_NAME("MNIST_test"); // Name of dataset.
+//const H5std_string DATASET_NAME("AMNIST"); // Name of dataset.
+//const H5std_string DATASET_NAME("NAMNIST"); // Name of dataset.
+//const H5std_string DATASET_NAME("C1_Train"); // Name of dataset.
+//const H5std_string DATASET_NAME("C2_Train"); // Name of dataset.
+//const H5std_string DATASET_NAME("C1C2_Train"); // Name of dataset.
+//const H5std_string DATASET_NAME("C3_Train"); // Name of dataset.
+//const H5std_string DATASET_NAME("C4_Train"); // Name of dataset.
+//const H5std_string DATASET_NAME("C5_Train"); // Name of dataset.
+//const H5std_string DATASET_NAME("MNIST_Test"); // Name of dataset.
+//const H5std_string DATASET_NAME("NMNIST_Test"); // Name of dataset.
+//const H5std_string DATASET_NAME("C1_Test"); // Name of dataset.
+const H5std_string DATASET_NAME("C2_Test"); // Name of dataset.
+//const H5std_string DATASET_NAME("C1C2_Test"); // Name of dataset.
+//const H5std_string DATASET_NAME("C3_Test"); // Name of dataset.
+//const H5std_string DATASET_NAME("C4_Test"); // Name of dataset.
+//const H5std_string DATASET_NAME("C5_Test"); // Name of dataset.
 //const H5std_string DATASET_NAME("LinearReg1000000"); // Name of dataset.
-//const H5std_string DATASET_NAME("SUSY_dataset"); // Name of dataset.
-//const H5std_string DATASET_NAME("SUSY"); // Name of dataset.
 
 
 typedef std::chrono::time_point<std::chrono::steady_clock> chr_time;
@@ -94,20 +110,35 @@ int main(void){
 	    countt[0] = DSET_BUFF_SZ; countt[1] = DATA_SIZE;// The number of elements along that dimension.
 	    dimsm[0] = DSET_BUFF_SZ; dimsm[1] = DATA_SIZE;// Size of selected subset of dataset.
 
-	    myfile.rdbuf()->pubsetbuf(mybuffer,BUFFER_SIZE);
+	    myfile.rdbuf()->pubsetbuf(mybuffer, BUFFER_SIZE);
 		//myfile.open("linear_dataset50.txt"); // Opening dataset file.
 		//myfile.open("linear_dataset5000.txt"); // Opening dataset file.
 		//myfile.open("linear_dataset600000.txt"); // Opening dataset file.
 		//myfile.open("linear_dataset1000000.txt"); // Opening dataset file.
 		//myfile.open("MNIST_train.txt"); // Opening dataset file.
-		myfile.open("AMNIST_train.txt"); // Opening dataset file.
+		//myfile.open("AMNIST.txt"); // Opening dataset file.
+		//myfile.open("NAMNIST.txt"); // Opening dataset file.
+		//myfile.open("C1_Train.txt"); // Opening dataset file.
+		//myfile.open("C2_Train.txt"); // Opening dataset file.
+		//myfile.open("C1C2_Train.txt"); // Opening dataset file.
+		//myfile.open("C3_Train.txt"); // Opening dataset file.
+		//myfile.open("C4_Train.txt"); // Opening dataset file.
+		//myfile.open("C5_Train.txt"); // Opening dataset file.
 		//myfile.open("MNIST_test.txt"); // Opening dataset file.
+		//myfile.open("NMNIST_test.txt"); // Opening dataset file.
+		//myfile.open("C1_Test.txt"); // Opening dataset file.
+		myfile.open("C2_Test.txt"); // Opening dataset file.
+		//myfile.open("C1C2_Test.txt"); // Opening dataset file.
+		//myfile.open("C3_Test.txt"); // Opening dataset file.
+		//myfile.open("C4_Test.txt"); // Opening dataset file.
+		//myfile.open("C5_Test.txt"); // Opening dataset file.
+		//myfile.open("Stream_MNIST_test.txt"); // Opening dataset file.
 		//myfile.open("linear_dataset_Regression_1000000.txt"); // Opening dataset file.
 		//myfile.open("SUSY_Dataset_Normalized.txt"); // Opening dataset file.
 		//myfile.open("SUSY_Dataset.txt"); // Opening dataset file.
 		
 		if(myfile.is_open()){
-
+		
 			cout << endl
 				 << "File is open" 
 				 << endl;
@@ -158,13 +189,13 @@ int main(void){
 					memspace.selectAll();
 					
 					// For debugging
-		       		cout<<endl<<"rd : "<<rd<<endl;
-		       		cout<<"offset[0] : "<<offset[0]<<endl;
-					cout<<"offset[1] : "<<offset[1]<<endl;
-		       		cout<<"countt[0] : "<<countt[0]<<endl;
-					cout<<"countt[1] : "<<countt[1]<<endl;
-		       		cout<<"dimsm[0] : "<<dimsm[0]<<endl;
-					cout<<"dimsm[1] : "<<dimsm[1]<<endl<<endl;
+		       		cout << endl << "rd : " << rd<<endl;
+		       		cout << "offset[0] : " << offset[0] << endl;
+					cout << "offset[1] : " << offset[1] << endl;
+		       		cout << "countt[0] : " << countt[0] << endl;
+					cout << "countt[1] : " << countt[1] << endl;
+		       		cout << "dimsm[0] : " << dimsm[0] << endl;
+					cout << "dimsm[1] : " << dimsm[1] << endl << endl;
 
 		       		// Write subset to the dataset.
 		       		dataset->write(buffered_dataset, PredType::NATIVE_DOUBLE, memspace, dspace);

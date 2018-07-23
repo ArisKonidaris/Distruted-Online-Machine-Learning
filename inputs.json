@@ -4,7 +4,7 @@
 		"encoding" : "UTF-8",
 		"net_name_1" : "net1",
 		"net_name_2" : "net2",
-		"number_of_networks" : 2,
+		"number_of_networks" : 1,
 		"learning_problem" : "classification",
 		"negative_labels" : true,
 		"data" : "tests_hdf5_Data",
@@ -14,9 +14,9 @@
 	
 	"tests_hdf5_Data":{
 		"encoding" : "UTF-8",
-		"batch_size" : 64,
-		"warmup_size" : 64,
-		"test_size" : 10000
+		"batch_size" : 50,
+		"warmup_size" : 500,
+		"test_size" : 0.2
 	},
 	
 	"tests_Generated_Data":{
@@ -31,9 +31,9 @@
 	"gm_network_net1":{ // format : gm_network_<network_name>
 		"encoding" : "UTF-8",
 		"number_of_local_nodes" : 4,
-		"learning_algorithm" : "PA", // Learning algorithm options : [PA, Kernel_PA, MLP, PA_Reg, NN_Reg]
-		"parameters_of_learner" : "Parameters_Passive_Aggressive_Classifier",
-		"distributed_learning_algorithm" : "dist_algo_net1"
+		"learning_algorithm" : "MLP", // Learning algorithm options : [PA, Kernel_PA, MLP, PA_Reg, NN_Reg]
+		"parameters_of_learner" : "NN_Classifier",
+		"distributed_learning_algorithm" : "dist_algo_net3"
 	},
 	
 	"gm_network_net2":{ // format : gm_network_<network name>
@@ -59,11 +59,11 @@
 	
 	"dist_algo_net2":{
 		"algorithm" : "Michael_Kamp",
-		"threshold" : 0.004,
-		"batch_size" : 30
+		"threshold" : 0.000008,
+		"batch_size" : 128
 	},
 	
-	// This is for newral networks.
+	// This is for neural networks.
 	"dist_algo_net3":{
 		"algorithm" : "Michael_Kamp",
 		"threshold" : 0.08,
@@ -93,14 +93,12 @@
 		"file_name" : "TestFile2.h5", // The name of the hdf5 file.
 		//"dataset_name" : "Linear5000", // The name of the dataset in the hdf5 file.
 		//"dataset_name" : "Linear600000", // The name of the dataset in the hdf5 file.
-		//"dataset_name" : "Linear1000000", // The name of the dataset in the hdf5 file.
+		"dataset_name" : "Linear1000000" // The name of the dataset in the hdf5 file.
 		//"dataset_name" : "LinearReg1000000", // The name of the dataset in the hdf5 file.
 		//"dataset_name" : "SUSY_dataset", // The SUSY dataset from the UCI Machine Learning Repository
 		//"dataset_name" : "SUSY", // The SUSY dataset from the UCI Machine Learning Repository
-		"train_dset_name" : "AMNIST_train",
-		"test_dset_name" : "MNIST_test",
-		"predictions_file_name" : "PA_II_Predictions.csv", // File to save the predictions.
-		"model_file_name" : "PA_II_Model.csv" // File to save the model.
+		//"train_dset_name" : "AMNIST_train",
+		//"test_dset_name" : "MNIST_test"
 	},
 	
 	"data_classificaton" : {
@@ -215,6 +213,59 @@
 		"eps" : 1e-8, // Epsilon of the optimizer.
 		"maxIterations" : 1, // Maximum iterations of the optimizer.
 		"tolerance" : 1e-8 // Tolerance of the optimizer.
+	},
+
+	"ELM" : {
+		"encoding" : "UTF-8",
+		"batch_size" : 128,
+		"experiment" : 4,
+		"neurons" : 250
+	},
+
+	"experimental_data" : {
+		"encoding" : "UTF-8",
+		"file_name" : "Experimental_Datasets.h5", // The name of the hdf5 file.
+		"experiment" : "exp3"
+	},
+
+	"exp1" : {
+		"train_dset_name" : "AMNIST",
+		"test_dset_name" : "MNIST_Test"
+	},
+
+	"exp2" : {
+		"train_dset_name" : "AMNIST",
+		"test_dset_name" : "MNIST_Test",
+		"train_dset_name_2" : "NAMNIST",
+		"test_dset_name_2" : "NMNIST_Test"
+	},
+
+	"exp3" : {
+		"train_dset_name" : "C1_Train",
+		"test_dset_name" : "C1_Test",
+		"train_dset_name_2" : "AMNIST",
+		"test_dset_name_2" : "MNIST_Test"
+	},
+
+	"exp4" : {
+		"train_dset_name" : "C1_Train",
+		"test_dset_name" : "C1_Test",
+		"train_dset_name_2" : "C2_Train",
+		"test_dset_name_2" : "C2_Test"
+	},
+
+	"exp5" : {
+		"train_dset_name" : "C2_Train",
+		"test_dset_name" : "C2_Test",
+		"train_dset_name_2" : "AMNIST",
+		"test_dset_name_2" : "MNIST_Test"
+	},
+
+	"exp6" : {
+		"train_dset_name" : "C2_Train",
+		"test_dset_name" : "C2_Test",
+		"train_dset_name_2" : "C1_Train",
+		"test_dset_name_2" : "C2_Test"
 	}
 
 }

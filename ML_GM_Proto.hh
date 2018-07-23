@@ -13,7 +13,7 @@
 #include "Machine_Learning.hh"
 #include "dsource.hh"
 #include "dsarch.hh"
-#include <dlib/cuda/tensor_tools.h>
+//#include <dlib/cuda/tensor_tools.h>
 
 /**
 	\file Distributed stream system architecture simulation classes for distributed machine learning.
@@ -57,6 +57,25 @@ protected:
 	size_t tcp_byts;
 
 };
+
+struct float_value
+{
+	const float value;
+	
+	inline float_value(float qntm):value(qntm) { }
+	
+	size_t byte_size() const { return sizeof(float); }
+	
+};
+	
+struct increment
+{
+	const int increase;
+	
+	inline increment(int inc):increase(inc) { }
+	
+	size_t byte_size() const { return sizeof(int); }
+};
 	
 namespace MlPack_GM_Proto{
 
@@ -69,31 +88,72 @@ namespace MlPack_GM_Proto{
   */
 struct model_state
 {
-	const arma::mat& _model;
+	const vector<arma::mat>& _model;
 	size_t updates;
 
-	inline model_state(const arma::mat& _mdl, size_t _updates)
+	inline model_state(const vector<arma::mat>& _mdl, size_t _updates)
 		: _model(_mdl), updates(_updates) { }
 
-	size_t byte_size() const { return (_model.n_elem)*sizeof(double); }
+	size_t byte_size() const;
 };
 
+struct p_model_state
+{
+	const vector<arma::mat*>& _model;
+	size_t updates;
+
+	inline p_model_state(const vector<arma::mat*>& _mdl, size_t _updates)
+		   : _model(_mdl), updates(_updates) { }
+
+	size_t byte_size() const;
+};
+
+struct int_num{
+	const size_t number;
+	
+	inline int_num(const size_t nb)
+	       :number(nb) { }
+	
+	size_t byte_size() const;
+	
+};
+
+struct matrix_message{
+	const arma::mat& sub_params;
+	
+	inline matrix_message(const arma::mat sb_prms)
+	       :sub_params(sb_prms) { }
+		   
+	size_t byte_size() const;
+};
 
 /** 
 	The base class of a safezone function for machine learning purposes.
 	*/
 struct ml_safezone_function {
 	
-	arma::mat& GlobalModel; // The global model.
+	vector<arma::mat>& GlobalModel; // The global model.
+	vector<float> hyperparameters; // A vector of hyperparameters.
 	
-	ml_safezone_function(arma::mat& mdl);
+	ml_safezone_function(vector<arma::mat>& mdl);
 	virtual ~ml_safezone_function();
 	
-	const arma::mat& getGlobalModel() const;
-	virtual double checkIfAdmissible(const size_t counter) const { return 0.; }
-	virtual double checkIfAdmissible(const arma::mat&) const { return 0.; }
-	virtual double checkIfAdmissible(const arma::cube&) const { return 0.; } 
+	const vector<arma::mat>& getGlobalModel() const { return GlobalModel; }
+	void updateDrift(vector<arma::mat>& drift, vector<arma::mat*>& vars, float mul) const;
+	
+	virtual float Zeta(const vector<arma::mat>& pars) const { return 0.; }
+	virtual float Zeta(const vector<arma::mat*>& pars) const { return 0.; }
+	
+	virtual size_t checkIfAdmissible(const size_t counter) const { return 0.; }
+	virtual float checkIfAdmissible(const vector<arma::mat>& mdl) const { return 0.; }
+	virtual float checkIfAdmissible(const vector<arma::mat*>& mdl) const { return 0.; }
+	virtual float checkIfAdmissible(const vector<arma::mat*>& par1, const vector<arma::mat>& par2) const { return 0.; }
+	
+	virtual float checkIfAdmissible_v2(const vector<arma::mat>& drift) const { return 0.; }
+	virtual float checkIfAdmissible_v2(const vector<arma::mat*>& drift) const { return 0.; }
+	
 	virtual size_t byte_size() const { return 0; }
+	vector<float> hyper() const { return hyperparameters; }
 	virtual void pr() { cout << endl << "Simple safezone function." << endl; }
 };
 
@@ -108,12 +168,12 @@ struct Batch_Learning : ml_safezone_function {
 	
 	size_t threshold; // The maximum number of points fitted by each node before requesting synch from the Hub.
 	
-	Batch_Learning(arma::mat& GlMd);
-	Batch_Learning(arma::mat& GlMd, size_t thr);
+	Batch_Learning(vector<arma::mat>& GlMd);
+	Batch_Learning(vector<arma::mat>& GlMd, size_t thr);
 	~Batch_Learning();
 	
-	double checkIfAdmissible(const size_t counter) const override;
-	size_t byte_size() const override { return GlobalModel.n_elem*sizeof(double) + sizeof(size_t); }
+	size_t checkIfAdmissible(const size_t counter) const override;
+	size_t byte_size() const override;
 };
 
 /**
@@ -124,18 +184,27 @@ struct Batch_Learning : ml_safezone_function {
  */
 struct Variance_safezone_func : ml_safezone_function {
 	
-	double threshold; // The threshold of the variance between the models of the network.
+	float threshold; // The threshold of the variance between the models of the network.
 	size_t batch_size; // The number of points seen by the node since the last synchronization.
 	
-	Variance_safezone_func(arma::mat& GlMd);
-	Variance_safezone_func(arma::mat& GlMd, size_t batch_sz);
-	Variance_safezone_func(arma::mat& GlMd, double thr);
-	Variance_safezone_func(arma::mat& GlMd, double thr, size_t batch_sz);
+	Variance_safezone_func(vector<arma::mat>& GlMd);
+	Variance_safezone_func(vector<arma::mat>& GlMd, size_t batch_sz);
+	Variance_safezone_func(vector<arma::mat>& GlMd, float thr);
+	Variance_safezone_func(vector<arma::mat>& GlMd, float thr, size_t batch_sz);
 	~Variance_safezone_func();
 	
-	double checkIfAdmissible(const size_t counter) const override;
-	double checkIfAdmissible(const arma::mat& mdl) const override;
-	size_t byte_size() const override { return (1+GlobalModel.n_elem)*sizeof(double) + sizeof(size_t); }
+	float Zeta(const vector<arma::mat>& pars) const override;
+	float Zeta(const vector<arma::mat*>& pars) const override;
+	
+	size_t checkIfAdmissible(const size_t counter) const override;
+	float checkIfAdmissible(const vector<arma::mat>& mdl) const override;
+	float checkIfAdmissible(const vector<arma::mat*>& mdl) const override;
+	float checkIfAdmissible(const vector<arma::mat*>& par1, const vector<arma::mat>& par2) const override;
+	
+	float checkIfAdmissible_v2(const vector<arma::mat>& drift) const override;
+	float checkIfAdmissible_v2(const vector<arma::mat*>& drift) const override;
+	
+	size_t byte_size() const override;
 };
 
 /** 
@@ -172,19 +241,28 @@ public:
 	
 	ml_safezone_function* getSZone() { return (szone!=nullptr) ? szone : nullptr; }
 	
-	inline double operator()(const size_t counter)
+	inline void operator()(vector<arma::mat>& drift, vector<arma::mat*>& vars, float mul){
+		szone->updateDrift(drift, vars, mul);
+	}
+	
+	inline size_t operator()(const size_t counter)
 	{
 		return (szone!=nullptr) ? szone->checkIfAdmissible(counter) : NAN;
 	}
 	
-	inline double operator()(const arma::mat& mdl)
+	inline float operator()(const vector<arma::mat>& mdl)
 	{
 		return (szone!=nullptr) ? szone->checkIfAdmissible(mdl) : NAN;
 	}
 	
-	inline double operator()(const arma::cube& mdls)
+	inline float operator()(const vector<arma::mat*>& mdl)
 	{
-		return (szone!=nullptr) ? szone->checkIfAdmissible(mdls) : NAN;
+		return (szone!=nullptr) ? szone->checkIfAdmissible(mdl) : NAN;
+	}
+	
+	inline float operator()(const vector<arma::mat*>& par1, const vector<arma::mat>& par2)
+	{
+		return (szone!=nullptr) ? szone->checkIfAdmissible(par1, par2) : NAN;
 	}
 	
 	inline size_t byte_size() const {
@@ -203,14 +281,14 @@ public:
  */
 struct query_state
 {
-	arma::mat GlobalModel;  // The global model.
-	double accuracy; // The accuracy of the current global model.
+	vector<arma::mat> GlobalModel;  // The global model.
+	float accuracy; // The accuracy of the current global model.
 	
 	query_state();
-	query_state(arma::SizeMat sz);
+	query_state(vector<arma::SizeMat> vsz);
 	virtual ~query_state();
 	
-	void initializeGlobalModel(arma::SizeMat sz) { GlobalModel = arma::mat(sz, arma::fill::zeros); }
+	void initializeGlobalModel(vector<arma::SizeMat> vsz);
 	
 	/** Update the global model parameters.
 		
@@ -218,7 +296,10 @@ struct query_state
 		safezone should adjust to the new global model. For now
 		only the global model is adjusted.
 		*/
-	void update_estimate(arma::mat& mdl) { GlobalModel -= GlobalModel - mdl; }
+	void update_estimate(vector<arma::mat>& mdl);
+	void update_estimate(vector<arma::mat*>& mdl);
+	void update_estimate_v2(vector<arma::mat>& mdl);
+	void update_estimate_v2(vector<arma::mat*>& mdl);
 	
 	/**
 		Return a ml_safezone_func for the safe zone function.
@@ -229,7 +310,12 @@ struct query_state
 	 */
 	ml_safezone_function* safezone(string cfg, string algo);
 	
-	virtual size_t byte_size() const { return (1+GlobalModel.n_rows)*sizeof(double); }
+	virtual size_t byte_size() const {
+		size_t num_of_params = 0;
+		for(arma::mat param:GlobalModel)
+			num_of_params += param.n_elem;
+		return (1+num_of_params)*sizeof(float); 
+	}
 	
 };
 
@@ -243,6 +329,9 @@ struct protocol_config
 	string distributed_learning_algorithm;  // options : [ Batch_Learning, Michael_Kmp, Michael_Kmp_Kernel ]
 	string cfgfile;                         // The JSON file containing the info for the test.
 	string network_name;                    // The name of the network being queried.
+	
+	float precision = 0.01;                 // The precision of the FGM protocol.
+	float reb_mult = -1.;                   // The precision of the FGM protocol.
 };
 
 
@@ -261,8 +350,10 @@ struct continuous_query
 	continuous_query(arma::mat* tSet, arma::mat* tRes, string cfg, string nm);
 	virtual ~continuous_query() { }
 	
+	void setTestSet(arma::mat* tSet, arma::mat* tRes);
+	
 	inline query_state* create_query_state() { return new query_state(); }
-	inline query_state* create_query_state(arma::SizeMat sz) { return new query_state(sz); }
+	inline query_state* create_query_state(vector<arma::SizeMat> sz) { return new query_state(sz); }
 	virtual inline double queryAccuracy(MLPACK_Learner* lnr) { return 0.; }
 };
 
@@ -329,6 +420,11 @@ struct gm_learning_network : star_network<Net, Coord, Node>
 		this->hub->warmup(batch,labels);
 	}
 	
+	/// This is called to update a specific learning node in the network.
+	void end_warmup(){
+		this->hub->end_warmup();		
+	}
+	
 	virtual void start_round(){
 		this->hub->start_round();
 	}
@@ -343,32 +439,31 @@ struct gm_learning_network : star_network<Net, Coord, Node>
 } //*  End namespace MlPack_GM_Proto *//
 
 namespace DLib_GM_Proto{
-
 	
 /**
-	Wrapper for a state parameters.
+	Wrapper for state parameters.
 	
 	This class wraps a reference to the parameters of a model
-	together with a count of the updates it contains since the
+	together with the count of the updates it contains since the
 	last synchronization.
   */
+template<typename TempType>
 struct dl_model_state
 {
-	const vector<tensor*>& _model;
+	const vector<TempType*>& _model;
 	size_t updates;
 	size_t num_of_params;
 
-	inline dl_model_state(const vector<tensor*>& _mdl, size_t _updates)
+	inline dl_model_state(const vector<TempType*>& _mdl, size_t _updates)
 	: _model(_mdl), updates(_updates) {
-		num_of_params=0;
+		num_of_params = 0;
 		for(auto layer:_mdl){
-			num_of_params+=layer->size();
+			num_of_params += layer->size();
 		}
 	}
 
 	size_t byte_size() const { return num_of_params*sizeof(float); }
 };
-
 
 struct tensor_message
 {
@@ -393,21 +488,26 @@ struct tensor_message
 	*/
 struct dl_safezone_function {
 	
-	//resizable_tensor& GlobalModel; // The global model.
-	vector<resizable_tensor*>& GlobalModel; // The global model.
+	vector<resizable_tensor*>& GlobalModel; // A reference to the global model.
 	size_t num_of_params; // The number on parameters.
-	vector<float> hyperparameters; // Avector of hyperparameters.
+	vector<float> hyperparameters; // A vector of hyperparameters.
 	
-	//dl_safezone_function(resizable_tensor& mdl);
 	dl_safezone_function(vector<resizable_tensor*>& mdl);
 	virtual ~dl_safezone_function();
 	
-	//const resizable_tensor& getGlobalModel() const;
 	const vector<resizable_tensor*>& getGlobalModel() const;
-	virtual double checkIfAdmissible(const size_t counter) const { return 0.; }
-	//virtual double checkIfAdmissible(const resizable_tensor& pars) const { return 0.; }
-	virtual double checkIfAdmissible(const vector<resizable_tensor*>& pars) const { return 0.; }
-	virtual double checkIfAdmissible(const vector<tensor*>& pars) const { return 0.; }
+	virtual size_t checkIfAdmissible(const size_t counter) const { return 0.; }
+	
+	virtual float checkIfAdmissible(const vector<resizable_tensor*>& pars) const { return 0.; }
+	virtual float checkIfAdmissible(const vector<tensor*>& pars) const { return 0.; }
+	virtual float checkIfAdmissible(const vector<tensor*>& par1, const vector<resizable_tensor*>& par2) const { return 0.; }
+	
+	virtual float Zeta(const vector<tensor*>& pars) const { return 0.; }
+	virtual float Zeta(const vector<resizable_tensor*>& pars) const { return 0.; }
+	
+	virtual float checkAdmissibleNorm(const vector<resizable_tensor*>& pars) const { return 0.; }
+	virtual float checkAdmissibleNorm(const vector<tensor*>& pars) const { return 0.; }
+	
 	virtual size_t byte_size() const { return 0; }
 	vector<float> hyper() const { return hyperparameters; }
 	virtual void pr() { cout << endl << "Simple safezone function." << endl; }
@@ -424,14 +524,11 @@ struct Batch_safezone_function : dl_safezone_function {
 	
 	size_t threshold; // The maximum number of points fitted by each node before requesting synch from the Hub.
 	
-	//Batch_safezone_function(resizable_tensor& GlMd);
-	//Batch_safezone_function(resizable_tensor& GlMd, size_t thr);
 	Batch_safezone_function(vector<resizable_tensor*>& GlMd);
 	Batch_safezone_function(vector<resizable_tensor*>& GlMd, size_t thr);
 	~Batch_safezone_function();
 	
-	double checkIfAdmissible(const size_t counter) const override;
-	//size_t byte_size() const override { return GlobalModel.size()*sizeof(float) + sizeof(size_t); }
+	size_t checkIfAdmissible(const size_t counter) const override;
 	size_t byte_size() const override { return num_of_params*sizeof(float) + sizeof(size_t); }
 };
 
@@ -443,27 +540,27 @@ struct Batch_safezone_function : dl_safezone_function {
  */
 struct Param_Variance_safezone_func : dl_safezone_function {
 	
-	double threshold; // The threshold of the variance between the models of the network.
+	float threshold; // The threshold of the variance between the models of the network.
 	size_t batch_size; // The number of points seen by the node since the last synchronization.
-	
-	//Param_Variance_safezone_func(resizable_tensor& GlMd);
-	//Param_Variance_safezone_func(resizable_tensor& GlMd, size_t batch_sz);
-	//Param_Variance_safezone_func(resizable_tensor& GlMd, double thr);
-	//Param_Variance_safezone_func(resizable_tensor& GlMd, double thr, size_t batch_sz);
 	
 	Param_Variance_safezone_func(vector<resizable_tensor*>& GlMd);
 	Param_Variance_safezone_func(vector<resizable_tensor*>& GlMd, size_t batch_sz);
-	Param_Variance_safezone_func(vector<resizable_tensor*>& GlMd, double thr);
-	Param_Variance_safezone_func(vector<resizable_tensor*>& GlMd, double thr, size_t batch_sz);
+	Param_Variance_safezone_func(vector<resizable_tensor*>& GlMd, float thr);
+	Param_Variance_safezone_func(vector<resizable_tensor*>& GlMd, float thr, size_t batch_sz);
 	
 	~Param_Variance_safezone_func();
 	
-	double checkIfAdmissible(const size_t counter) const override;
-	//double checkIfAdmissible(const resizable_tensor& pars) const override;
-	double checkIfAdmissible(const vector<resizable_tensor*>& pars) const override;
-	double checkIfAdmissible(const vector<tensor*>& mdl) const override;
-	//size_t byte_size() const override { return GlobalModel.size()*sizeof(float) + sizeof(double) + sizeof(size_t); }
-	size_t byte_size() const override { return num_of_params*sizeof(float) + sizeof(double) + sizeof(size_t); }
+	size_t checkIfAdmissible(const size_t counter) const override;
+	
+	float checkIfAdmissible(const vector<resizable_tensor*>& pars) const override;
+	float checkIfAdmissible(const vector<tensor*>& mdl) const override;
+	float checkAdmissibleNorm(const vector<resizable_tensor*>& pars) const override;
+	float checkAdmissibleNorm(const vector<tensor*>& pars) const override;
+	float checkIfAdmissible(const vector<tensor*>& par1, const vector<resizable_tensor*>& par2) const override;
+	float Zeta(const vector<tensor*>& pars) const override;
+	float Zeta(const vector<resizable_tensor*>& pars) const override;
+	
+	size_t byte_size() const override { return (num_of_params+1)*sizeof(float) + sizeof(size_t); }
 };
 
 /** 
@@ -475,7 +572,7 @@ struct Param_Variance_safezone_func : dl_safezone_function {
 	provides a byte_size() method, making it suitable for integration with the middleware.
 	*/
 class dl_safezone {
-	dl_safezone_function* szone;        // the safezone function, if any
+	dl_safezone_function* szone; // the safezone function, if any
 public:
 
 	/// null state
@@ -500,24 +597,38 @@ public:
 	
 	dl_safezone_function* getSZone() { return (szone!=nullptr) ? szone : nullptr; }
 	
-	inline double operator()(const size_t counter)
+	inline size_t operator()(const size_t counter)
 	{
 		return (szone!=nullptr) ? szone->checkIfAdmissible(counter) : NAN;
 	}
 	
-	//inline double operator()(const resizable_tensor& mdl)
-	//{
-	//	return (szone!=nullptr) ? szone->checkIfAdmissible(mdl) : NAN;
-	//}
-	
-	inline double operator()(const vector<tensor*>& mdl)
+	inline float operator()(const vector<tensor*>& mdl)
 	{
 		return (szone!=nullptr) ? szone->checkIfAdmissible(mdl) : NAN;
 	}
 	
-	inline double operator()(const vector<resizable_tensor*>& mdl)
+	inline float operator()(const vector<resizable_tensor*>& mdl)
 	{
 		return (szone!=nullptr) ? szone->checkIfAdmissible(mdl) : NAN;
+	}
+	
+	inline float operator()(const vector<resizable_tensor*>& mdl, bool eikon)
+	{
+		if(eikon)
+			return (szone!=nullptr) ? szone->Zeta(mdl) : NAN;
+		return (szone!=nullptr) ? szone->checkIfAdmissible(mdl) : NAN;
+	}
+	
+	inline float operator()(const vector<tensor*>& mdl, bool eikon)
+	{
+		if(eikon)
+			return (szone!=nullptr) ? szone->Zeta(mdl) : NAN;
+		return (szone!=nullptr) ? szone->checkIfAdmissible(mdl) : NAN;
+	}
+	
+	inline float operator()(const vector<tensor*>& par1, const vector<resizable_tensor*>& par2)
+	{
+		return (szone!=nullptr) ? szone->checkIfAdmissible(par1, par2) : NAN;
 	}
 	
 	inline size_t byte_size() const {
@@ -530,34 +641,21 @@ public:
 /**
 	Base class for a query state object.
 
-	A query state holds the current global estimate model. It also honls the
+	A query state holds the current global estimate model. It also holds the
 	accuracy of the current global model (percentage of correctly classified
 	datapoins in case of classification and RMSE score in case of regression).
  */
 struct dl_query_state
 {
-	//resizable_tensor GlobalModel;  // The global model.
 	vector<resizable_tensor*> GlobalModel;  // The global model.
 	double accuracy; // The accuracy of the current global model.
 	size_t num_of_params; // The number on parameters.
 	
 	dl_query_state();
-	//dl_query_state(size_t sz);
 	dl_query_state(vector<resizable_tensor*>& mdl);
 	virtual ~dl_query_state();
 	
-	//void initializeGlobalModel(size_t sz) { GlobalModel.set_size(sz,1,1,1); GlobalModel=0; }
-	void initializeGlobalModel(const vector<tensor*>& mdl) {
-		num_of_params=0;
-		for(auto layer:mdl){
-			resizable_tensor* l;
-			l=new resizable_tensor();
-			l->set_size(layer->num_samples(), layer->k(), layer->nr(), layer->nc());
-			*l=0.;
-			GlobalModel.push_back(l);
-			num_of_params+=layer->size();
-		}
-	}
+	void initializeGlobalModel(const vector<tensor*>& mdl);
 	
 	/** Update the global model parameters.
 		
@@ -565,12 +663,7 @@ struct dl_query_state
 		safezone should adjust to the new global model. For now
 		only the global model is adjusted.
 		*/
-	//void update_estimate(resizable_tensor& mdl) { GlobalModel = resizable_tensor(mdl); }
-	void update_estimate(vector<resizable_tensor*>& mdl) {
-		for(size_t i=0;i<GlobalModel.size();i++){
-			dlib:memcpy(*GlobalModel.at(i),*mdl.at(i));
-		}
-	}
+	void update_estimate(vector<resizable_tensor*>& mdl);
 	
 	/**
 		Return a ml_safezone_func for the safe zone function.
@@ -581,7 +674,6 @@ struct dl_query_state
 	    */
 	dl_safezone_function* dl_safezone(string cfg, string algo);
 	
-	//virtual size_t byte_size() const { return GlobalModel.size()*sizeof(float)+sizeof(double); }
 	virtual size_t byte_size() const { return num_of_params*sizeof(float)+sizeof(double); }
 	
 };
@@ -592,13 +684,15 @@ struct dl_query_state
   */
 struct dl_protocol_config
 {
-	string learning_algorithm;              // options : [ PA, KernelPA, MLP, PA_Reg, NN_Reg]
-	string distributed_learning_algorithm;  // options : [ Batch_Learning, Michael_Kmp, Michael_Kmp_Kernel ]
+	string learning_algorithm;              // options : [ PA, KernelPA, MLP, PA_Reg, NN_Reg, LeNet]
+	string distributed_learning_algorithm;  // options : [ Batch_Learning, Michael_Kmp, VarFuncMon ]
 	string cfgfile;                         // The JSON file containing the info for the test.
 	string network_name;                    // The name of the network being queried.
 	int image_width = 28;                   // The pixel width of the image.
 	int image_height = 28;                  // The pixel height of the image.
 	int number_of_channels = 1;             // The number of channels of the image. (i.e. 3 in case of RGB image)
+	float precision = 0.01;                 // The precision of the FGM protocol.
+	float reb_mult = -1.;                   // The precision of the FGM protocol.
 };
 
 
@@ -612,7 +706,7 @@ struct dl_continuous_query
 	// These are attributes requested by the user
 	dl_protocol_config config;
 	
-	std::vector<matrix<feat>>* testSet;         // Test dataset without labels.
+	std::vector<matrix<feat>>* testSet;  // Test dataset without labels.
 	std::vector<label>* testResponses;   // Labels of the test dataset.
 	
 	dl_continuous_query(std::vector<matrix<feat>>* tSet, std::vector<label>* tRes, string cfg, string nm);
@@ -643,6 +737,8 @@ dl_continuous_query<feat,label>::dl_continuous_query(std::vector<matrix<feat>>* 
 						  .get("image_height", 0).asInt64();
 	config.number_of_channels = root["gm_network_"+nm]
 						        .get("number_of_channels", 0).asInt64();
+	config.precision = root[config.distributed_learning_algorithm].get("precision", 0.01).asFloat();
+	config.reb_mult = root[config.distributed_learning_algorithm].get("reb_mult", -1.).asFloat();
 	config.cfgfile = cfg;
 	
 	cout << "Query initialized : " << config.learning_algorithm << ", ";
@@ -726,17 +822,6 @@ struct dl_gm_learning_network : star_network<Net<feat,lb>, Coord<feat,lb>, Node<
 		else
 			return basic_network::create_channel(src, dst, endp);
 	}
-	
-	/*
-	/// This is called to update a specific learning node in the network.
-	void warmup(size_t site, std::vector<matrix<feat>>& batch, std::vector<lb>& labels){
-		this->source_site( this->sites.at(site)->site_id() )->warmup(batch, labels);		
-	}
-	
-	/// This is called to update a specific learning node in the network.
-	void end_warmup(size_t site){
-		this->source_site( this->sites.at(site)->site_id() )->end_warmup();		
-	}*/
 	
 	virtual void warmup(std::vector<matrix<feat>>& batch, std::vector<lb>& labels){
 		// let the coordinator initialize the nodes

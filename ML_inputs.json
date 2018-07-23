@@ -1,0 +1,69 @@
+{
+
+	"simulations":{
+		"encoding" : "UTF-8",
+		"net_name_1" : "net1",
+		"net_name_2" : "net2",
+		"net_name_3" : "net3",
+		"number_of_networks" : 1,
+		"learning_problem" : "classification",
+		"stream_distribution" : "Stream_Distribution1",
+		"data" : "tests_hdf5_Data",
+		"seed" : -1 // Give any non negative value for random reproducibility
+					// and any negative value for "completely random results".
+	},
+
+	"tests_hdf5_Data":{
+		"encoding" : "UTF-8",
+		"batch_size" : 64,
+		"warmup_size" : 64, // Max size : 1000 data points.
+		"test_size" : 20000,
+		"experiment" : 4
+	},
+
+	"Stream_Distribution1":{
+		"encoding" : "UTF-8",
+		"uniform" : false,
+		"B_prob" : 0.75,
+		"site_ratio" : 0.5
+	},
+
+	"gm_network_net1":{ // format : gm_network_<network_name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 4,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net1"
+	},
+	
+	"gm_network_net2":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net1"
+	},
+
+	"gm_network_net3":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 16,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net1"
+	},
+	
+	"dist_algo_net1":{
+		"algorithm" : "Michael_Kamp", // Michael_Kamp
+		"precision" : 0.01,
+		"reb_mult" : 1.0, // Give a positive value only for relancing
+		"threshold" : 90000000,
+		"batch_size" : 64
+	},
+
+	"ELM" : {
+		"encoding" : "UTF-8",
+		"batch_size" : 64,
+		"neurons" : 250
+	}
+
+}

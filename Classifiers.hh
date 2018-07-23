@@ -762,190 +762,133 @@ inline void MLP_Classifier::InitializePolicy() { optimizer->UpdatePolicy().Initi
 
 
 /*********************************************
-	Multi Layer Perceptron Classifier
+	 Extreme Learning Machine Classifier
 *********************************************/
 
-class CNN_Classifier{
+class ELM_Classifier{
 protected:
-	string name = "Convolutional Neural Network Classifier.";
+
+	string name = "Extreme Learning Machine Classifier";
+	arma::mat A; // Hidden Layer Weights.
+	arma::mat b; // Hidden Layer Biases.
+	arma::mat beta; // Output Learnable Parameters.
+	arma::mat K; // Autocorrelation matrix of hidden layer matrix H.
+	size_t num_of_neurons; // The number of neurons the hidden layer has.
 	Json::Value root; // JSON file to read the hyperparameters.  [optional]
-	FFN<NegativeLogLikelihood<>, GaussianInitialization>* model;
-	
-	double stepSize;
-	int batchSize;
-	double beta1;
-	double beta2;
-	double eps;
-	int maxIterations;
-	double tolerance;
-	//Adam* optimizer;
-	SGD<AdamUpdate>* opt; // The Adam optimizer.
+	vector<arma::mat*> model; // All the parameters of the model stacked up in a vector.
 	
 public:
-	CNN_Classifier(const string cfg);
+	ELM_Classifier(string cfg);
 	
-	inline void fit(arma::mat& batch, arma::mat& labels);
-	arma::mat predictOnBatch(arma::mat& batch);
-	inline double predict(arma::mat& data_point);
-	inline vector<double> accuracy(arma::mat& testbatch, arma::mat& labels);
-	inline arma::mat& getModel();
-	inline SGD<AdamUpdate>* Opt();
-	inline int batch_size();
-	inline void InitializePolicy();
+	// Method that initializes the learner.
+	void initializeModel(size_t num_of_feats, size_t num_of_classes);
 	
+	// Method that expands each neuron with sz weights. This happens in case of Virtual Concept Drift.
+	void handleVD(size_t sz);
+	
+	// Method that expands the beta vector by sz parameters. This happens in case of Real Concept Drift.
+	void handleRD(size_t sz);
+	
+	// Stream update.
+	inline void fit(const arma::mat& batch, const arma::mat& labels);
+	
+	// Make a prediction.
+	arma::mat predict(const arma::mat& batch) const;
+	
+	// Get score.
+	double accuracy(const arma::mat& testbatch, const arma::mat& labels) const;
+	
+	// Information getters.
+	inline string getName() { return name; }
+	inline size_t LayerSize() { return num_of_neurons; }
+	inline vector<arma::mat*> getModel() { return model; }
 };
 
-CNN_Classifier::CNN_Classifier(const string cfg){
+ELM_Classifier::ELM_Classifier(string cfg){
 	try{
-		
 		std::ifstream cfgfile(cfg);
 		cfgfile >> root;
-		
-		stepSize = root["CNN_Classifier"]
-				   .get("stepSize",-1).asDouble();
-		if(stepSize <= 0.){
-			cout << endl <<"Invalid parameter stepSize given." << endl;
-			cout << "Parameter stepSize must be a positive double." << endl;
-			throw;
-		}
-		
-		batchSize = root["CNN_Classifier"]
-					.get("batchSize",-1).asInt();
-		if(batchSize <= 0 && batchSize >=5000){
-			cout << endl <<"Invalid parameter batchSize given." << endl;
-			cout << "Parameter batchSize must be a positive integer." << endl;
-			throw;
-		}
-		
-		beta1 = root["CNN_Classifier"]
-				.get("beta1",-1).asDouble();
-		if(beta1 <= 0.){
-			cout << endl <<"Invalid parameter beta1 given." << endl;
-			cout << "Parameter beta1 must be a positive double." << endl;
-			throw;
-		}
-		
-		beta2 = root["CNN_Classifier"]
-				.get("beta2",-1).asDouble();
-		if(beta2 <= 0.){
-			cout << endl <<"Invalid parameter beta2 given." << endl;
-			cout << "Parameter beta2 must be a positive double." << endl;
-			throw;
-		}
-		
-		eps = root["CNN_Classifier"]
-			  .get("eps",-1).asDouble();
-		if(eps <= 0.){
-			cout << endl <<"Invalid parameter eps given." << endl;
-			cout << "Parameter eps must be a positive double." << endl;
-			throw;
-		}
-		
-		maxIterations = root["CNN_Classifier"]
-						.get("maxIterations",-1).asInt();
-		if(maxIterations <= 0 ){
-			cout << endl <<"Invalid parameter maxIterations given." << endl;
-			cout << "Parameter maxIterations must be a positive integer." << endl;
-			throw;
-		}
-		
-		tolerance = root["CNN_Classifier"]
-					.get("tolerance",-1).asDouble();
-		if(tolerance <= 0.){
-			cout << endl <<"Invalid parameter tolerance given." << endl;
-			cout << "Parameter tolerance must be a positive double." << endl;
-			throw;
-		}
-		
-		// Built the model
-		model = new FFN<NegativeLogLikelihood<>, GaussianInitialization>();
-		model->Add<Convolution<> >(1, 32, 5, 5, 1, 1, 2, 2, 28, 28);
-		model->Add<ReLULayer<> >();
-		model->Add<MaxPooling<> >(2,2,2,2);
-		model->Add<Convolution<> >(32, 64, 5, 5, 1, 1, 2, 2, 14, 14);
-		model->Add<ReLULayer<> >();
-		model->Add<MaxPooling<> >(2,2,2,2);
-		model->Add<Linear<> >(7*7*64,1024);
-		model->Add<ReLULayer<> >();
-		model->Add<Dropout<> >();
-		model->Add<Linear<> >(1024,10);
-		//model->Add<LogSoftMax<> >();
-	
-		model->ResetParameters();
-		cout << arma::size(model->Parameters()) << endl;
-		opt = new SGD<AdamUpdate>(stepSize, batchSize, maxIterations, tolerance, false);
-		opt->UpdatePolicy() = AdamUpdate(eps, beta1, beta2);
-		opt->ResetPolicy() = false;
-		InitializePolicy();
+		num_of_neurons = root["ELM"].get("neurons",0).asInt();
 	}catch(...){
 		throw;
 	}
 }
 
-inline void CNN_Classifier::fit(arma::mat& batch, arma::mat& labels){
-	model->Train( batch, labels, *opt );
+void ELM_Classifier::initializeModel(size_t num_of_feats, size_t num_of_classes){
+	A = 2.*arma::randu<arma::mat>(num_of_feats, num_of_neurons)-1.;
+	b = 2.*arma::randu<arma::mat>(1, num_of_neurons)-1.;
+	beta = 2.*arma::zeros<arma::mat>(num_of_neurons, num_of_classes)-1.;
+	K = arma::zeros<arma::mat>(num_of_neurons, num_of_neurons);
+	
+	model.push_back(&K);
+	model.push_back(&beta);
 }
 
-arma::mat CNN_Classifier::predictOnBatch(arma::mat& batch){
+void ELM_Classifier::handleVD(size_t sz){
+	arma::mat A_ = 2.*arma::randu<arma::mat>(A.n_rows+sz, num_of_neurons)-1.;
+	A_.rows(0, A.n_rows-1) = A;
+	A = A_;
+}
+
+void ELM_Classifier::handleRD(size_t sz){
+	arma::mat beta_ = arma::zeros<arma::mat>(num_of_neurons, beta.n_cols+sz);
+	beta_.cols(0, beta.n_cols-1) = beta;
+	beta = beta_;
+}
+
+inline void ELM_Classifier::fit(const arma::mat& batch, const arma::mat& labels){
 	
-	arma::mat predictionTemp;
-	model->Predict(batch, predictionTemp);
+	// Check if the model has not been initialized.
+	if(A.n_elem==0)
+		initializeModel(batch.n_rows, labels.n_rows);
 	
-	arma::mat prediction = arma::zeros<arma::mat>(1, predictionTemp.n_cols);
-	for(size_t i = 0; i < predictionTemp.n_cols; ++i){
-		prediction(0,i) = arma::as_scalar( arma::find( arma::max(predictionTemp.col(i)) == predictionTemp.col(i), 1) );
+	// Check for Virtual Drift in the Stream. If True, expand the neurons of the network.
+	if(batch.n_rows>A.n_rows)
+		handleVD(batch.n_rows-A.n_rows);
+		
+	// Check for Real Drift in the Stream. If True, expand the beta parameters of the network.
+	if(labels.n_rows>beta.n_cols)
+		handleRD(labels.n_rows-beta.n_cols);
+	
+	// Fit the data to the network.
+	arma::mat H = batch.t()*A;
+	H = arma::tanh(H.each_row()+b);
+	//H = H.each_row()+b;
+	//H.transform( [](double val) { return (val < 0.) ? double(0) : val; } );
+	arma::mat H_T = H.t();
+	K += H_T*H;
+	beta += arma::inv(K)*H_T*(labels.t()-H*beta);
+	//beta += arma::pinv(K)*H_T*(labels.t()-H*beta);
+	
+}
+
+arma::mat ELM_Classifier::predict(const arma::mat& batch) const{
+	
+	arma::mat H = batch.t()*A;
+	H = arma::tanh(H.each_row()+b);
+	//H = H.each_row()+b;
+	//H.transform( [](double val) { return (val < 0.) ? double(0) : val; } );
+	arma::mat predictionTemp = H*beta;
+	
+	arma::mat prediction = arma::zeros<arma::mat>(1, predictionTemp.n_rows);
+	for(size_t i=0; i<predictionTemp.n_rows; i++){
+		prediction(0,i) = arma::as_scalar( arma::find( arma::max(predictionTemp.row(i)) == predictionTemp.row(i), 1) );
 	}
 	
 	return prediction;
-	
 }
 
-inline double CNN_Classifier::predict(arma::mat& data_point){
-	
-	// Check for invalid data point given
-	if( data_point.n_cols < 0 || data_point.n_cols > 1){
-		return -1;
-	}
-	
-	arma::mat predictionTemp;
-	model->Predict(data_point, predictionTemp);
-	
-	double prediction = arma::as_scalar( arma::find( arma::max(predictionTemp.col(0)) == predictionTemp.col(0), 1) );
-	return prediction;
-	
-}
-
-inline vector<double> CNN_Classifier::accuracy(arma::mat& testbatch, arma::mat& labels){
-	
-	arma::mat predictionTemp;
-	model->Predict(testbatch, predictionTemp);
-	
-	arma::mat prediction = arma::zeros<arma::mat>(1, predictionTemp.n_cols);
-	for(size_t i = 0; i < predictionTemp.n_cols; ++i){
-		prediction(0,i) = arma::as_scalar( arma::find( arma::max(predictionTemp.col(i)) == predictionTemp.col(i), 1) )  +1;
-	}
-	
-	int errors = 0;
-	for(unsigned i = 0; i < prediction.n_cols; ++i){
-		if(labels(0,i) != prediction(0,i)){
+double ELM_Classifier::accuracy(const arma::mat& testbatch, const arma::mat& labels) const{
+	// Calculate accuracy.
+	int errors=0;
+	arma::mat prediction = predict(testbatch);
+	for(size_t i=0; i<labels.n_cols; i++){
+		if(prediction(0,i) != arma::as_scalar( arma::find( arma::max(labels.unsafe_col(i)) == labels.unsafe_col(i), 1) ))
 			errors++;
-		}
 	}
-	
-	vector<double> score;
-	score.push_back(100.0*(labels.n_elem-errors)/(labels.n_elem));
-	score.push_back((double)errors);
-	
+	double score = 100.0*(labels.n_elem-errors)/(labels.n_elem);
 	return score;
 }
-
-inline arma::mat& CNN_Classifier::getModel(){ return model->Parameters(); }
-
-inline SGD<AdamUpdate>* CNN_Classifier::Opt() { return opt; }
-
-inline int CNN_Classifier::batch_size() { return batchSize; }
-
-inline void CNN_Classifier::InitializePolicy() { opt->UpdatePolicy().Initialize(model->Parameters().n_rows, model->Parameters().n_cols); }
 
 
 /*********************************************
@@ -954,14 +897,24 @@ inline void CNN_Classifier::InitializePolicy() { opt->UpdatePolicy().Initialize(
 
 class LeNet{
 	
-using trnet = loss_multiclass_log<relu<fc<10,
-								  dropout<relu<fc<1024,
-							      max_pool<2,2,2,2,
-							      relu<add_layer<con_<64,5,5,1,1,2,2>,
-							      max_pool<2,2,2,2,
-							      relu<add_layer<con_<32,5,5,1,1,2,2>,
-							      input<matrix<unsigned char>>
-							      >>>>>>>>>>>>;
+using train_net = loss_multiclass_log<relu<fc<10,
+								      dropout<relu<add_layer<bn_<FC_MODE>,fc<256,
+							          max_pool<2,2,2,2,
+							          relu<add_layer<bn_<CONV_MODE>,add_layer<con_<64,5,5,1,1,2,2>,
+							          max_pool<2,2,2,2,
+							          relu<add_layer<bn_<CONV_MODE>,add_layer<con_<32,5,5,1,1,2,2>,
+							          input<matrix<unsigned char>>
+							          >>>>>>>>>>>>>>>;
+									  
+using test_net = loss_multiclass_log<relu<fc<10,
+									 dropout<relu<add_layer<affine_,fc<256,
+									 max_pool<2,2,2,2,
+									 relu<add_layer<affine_,add_layer<con_<64,5,5,1,1,2,2>,
+									 max_pool<2,2,2,2,
+									 relu<add_layer<affine_,add_layer<con_<32,5,5,1,1,2,2>,
+									 input<matrix<unsigned char>>
+									 >>>>>>>>>>>>>>>;
+									 
 public:
 	void initializeTrainer();
 	void train(std::vector<matrix<unsigned char>> im,std::vector<unsigned long> lb);
@@ -971,16 +924,18 @@ public:
 	void setDropProb(float prob);
 	auto& getNet();
 protected:
-	trnet net;
-	dnn_trainer<trnet,adam>* trainer;
+	train_net net; // The training network.
+	test_net t_net; // The testing network.
+	dnn_trainer<train_net,adam>* trainer;
 };
 
 void LeNet::initializeTrainer(){
-	trainer = new dnn_trainer<trnet,adam>(net,adam(0.,0.9,0.999));
+	trainer = new dnn_trainer<train_net,adam>(net,adam(0.,0.9,0.999));
 	trainer->be_verbose();
 	trainer->set_learning_rate(1e-4);
     trainer->set_min_learning_rate(1e-4);
 	trainer->set_learning_rate_shrink_factor(1.);
+	//trainer->set_synchronization_file("mnist_resnet_sync", std::chrono::minutes(15));
 }
 
 void LeNet::train(std::vector<matrix<unsigned char>> im,std::vector<unsigned long> lb){
@@ -992,7 +947,8 @@ void LeNet::printNet(){
 }
 
 void LeNet::setDropProb(float prob){
-	layer<3>(net).layer_details()=dropout_(prob);
+	layer<3>(t_net).layer_details()=dropout_(prob);
+	//layer<8>(t_net).layer_details()=dropout_(prob);
 }
 
 void LeNet::Synch(){
@@ -1001,7 +957,10 @@ void LeNet::Synch(){
 
 double LeNet::getAccuracy(std::vector<matrix<unsigned char>> im,std::vector<unsigned long> lb, bool prnt=true){
 	net.clean();
-	std::vector<unsigned long> prediction = net(im);
+	t_net = net;
+	setDropProb(0.);
+	std::vector<unsigned long> prediction = t_net(im);
+	setDropProb(0.5);
 	size_t correct=0;
 	size_t wrong=0;
 	double accuracy;
@@ -1251,6 +1210,253 @@ void Simple_Classification< clsfr, DtTp >::getScore(arma::mat& testbatch, arma::
 	cout << "start test : " << start_test << endl;
 	cout << "errors : " << (int)accuracy.at(1) << endl;
 	cout << "accuracy : " << std::setprecision(6) << accuracy.at(0) << "%" << endl;
+}
+
+
+/*********************************************
+	       Extreme Classification
+*********************************************/
+
+template<typename clsfr, typename DtTp>
+class Extreme_Classification : public Classification{
+	typedef boost::shared_ptr<hdf5Source<DtTp>> PointToSource;
+protected:
+
+	Json::Value root; // JSON file to read the hyperparameters.
+	
+	clsfr* Classifier; // The classifier.
+	arma::mat testSet; // Test dataset for validation of the classification algorithm.
+	arma::mat testResponses; // Arma row vector containing the labels of the evaluation set.
+	size_t batch_size; // The batch size of learning.
+	double score; // Save the score of the classifier. (To be used later for hyperparameter searching)
+	
+	int experiment; // The concept drift experiment.
+	int num_of_classes; // The number of classes in this concept.
+	PointToSource TrainSource; // Data Source to read the dataset in streaming form.
+	PointToSource TestSource; // Data Source to read the dataset in streaming form.
+	
+public:
+
+	/* Constructor */
+	Extreme_Classification(string cfg);
+	
+	/* Destructor */
+	~Extreme_Classification();
+	
+	// Method initializing the test dataset matrices.
+	void makeTestDataset();
+	
+	// Method that initiates the training simulation.
+	void Train() override;
+	
+	// Make a prediction.
+	inline arma::mat MakePrediction(arma::mat& batch) { return Classifier->predict(batch); }
+	
+	// Evaluate the classifier on a test set.
+	void getScore(arma::mat& testbatch, arma::mat& labels);
+	
+	// Getters.
+	inline arma::mat& getTestSet() { return testSet; }
+	inline arma::mat& getTestSetLabels() { return testResponses; }
+	
+};
+
+template<typename clsfr, typename DtTp>
+Extreme_Classification< clsfr, DtTp >::Extreme_Classification(string cfg)
+{
+	std::srand (time(NULL));
+	try{
+		// Parse from JSON file.
+		std::ifstream cfgfile(cfg);
+		cfgfile >> root;
+		
+		// Initialize the Classifier object.
+		Classifier = new clsfr(cfg);
+
+		string train_concept;
+		string test_concept;
+		
+		num_of_classes = 0;
+		
+		batch_size = root["ELM"].get("batch_size",0).asInt();
+		if(batch_size<0 || batch_size>1000){
+			cout << "Invalid batch size." << endl;
+			cout << "Setting the batch size to default : 64" << endl;
+			batch_size = 64;
+		}
+		
+		experiment = root["ELM"].get("experiment",0).asInt();
+		if(experiment!=1 && experiment!=2 &&experiment!=3 &&experiment!=4){
+			cout << "Invalid experiment number." << endl;
+			cout << "Initializing default experiment : 1" << endl;
+			experiment = 1;
+		}
+		if(experiment==1){
+			train_concept = "C1C2_Train";
+			test_concept = "C1C2_Test";
+		}else{
+			train_concept = "C1_Train";
+			test_concept = "C1_Test";
+		}
+
+		// Initialize data sources.
+		TrainSource = getPSource<DtTp>("TestFile2.h5",
+									  train_concept,
+									  false);
+		TestSource = getPSource<DtTp>("TestFile2.h5",
+									  test_concept,
+									  false);
+		
+		makeTestDataset();
+		
+	}catch(...){
+		cout << endl << "Something went wrong in Extreme_Classification object construction." << endl;
+		throw;
+	}
+}
+
+template<typename clsfr, typename DtTp>
+void Extreme_Classification< clsfr, DtTp >::makeTestDataset(){
+	
+	testSet = arma::zeros<arma::mat>(TestSource->getDataSize()-1, TestSource->getDatasetLength()); // Test features set.
+	arma::mat tempTestResponses = arma::zeros<arma::mat>(1, TestSource->getDatasetLength());
+	
+	size_t count = 0;
+	vector<DtTp>& buffer = TestSource->getbuffer(); // Initialize the dataset buffer.
+	while(TestSource->isValid()){
+		
+		arma::mat batch; // Arma column wise matrix containing the data points.
+		
+		// Load the batch from the buffer while removing the ids.
+		batch = arma::mat(&buffer[0],
+						  TestSource->getDataSize(),
+						  (int)TestSource->getBufferSize(),
+						  false,
+						  false);
+		
+		// Insert the batch to the test set.
+		testSet.cols(count, count+TestSource->getBufferSize()-1) = batch.rows(0, batch.n_rows-2);
+		tempTestResponses.cols(count, count+TestSource->getBufferSize()-1) = batch.row(batch.n_rows-1);
+		count += TestSource->getBufferSize(); // Update the number of processed elements.
+		
+		// Get the next 1000 data points from disk to stream them.
+		TestSource->advance();
+	}
+	
+	tempTestResponses -= 1.;
+	int num_of_cl = (int)tempTestResponses.max();
+	testResponses = arma::zeros<arma::mat>(num_of_cl+1, tempTestResponses.n_cols);
+	for(size_t i=0; i<tempTestResponses.n_cols; i++){
+		testResponses((int)tempTestResponses(0,i), i) = 1.;
+	}
+	
+}
+
+template<typename clsfr, typename DtTp>
+Extreme_Classification< clsfr, DtTp >::~Extreme_Classification(){ 
+	TrainSource = nullptr;
+	TestSource = nullptr;
+}
+
+template<typename clsfr, typename DtTp>
+void Extreme_Classification< clsfr, DtTp >::Train(){
+	vector<DtTp>& buffer = TrainSource->getbuffer(); // Initialize the dataset buffer.
+	int count = 0; // Count the number of processed elements.
+	
+	for(size_t con=0; con<2; con++){
+		while(TrainSource->isValid()){
+		
+			arma::mat batch; // Arma column wise matrix containing the data points.
+			
+			// Load the batch from the buffer while removing the ids.
+			batch = arma::mat(&buffer[0],
+							  TrainSource->getDataSize(),
+							  TrainSource->getBufferSize(),
+							  false,
+							  false);
+			arma::mat labels = batch.row(batch.n_rows-1)-1.;
+			batch.shed_row(batch.n_rows-1);
+								   
+			// Update the number of processed elements.
+			count += TrainSource->getBufferSize();
+				
+			// Fitting the buffer to the model.
+			size_t pointer = 0;
+			size_t cur_batch = 0;
+			while(true){
+				
+				// Calculating the appropriate batch size.
+				if(pointer+batch_size > TrainSource->getBufferSize()){
+					cur_batch = TrainSource->getBufferSize()%batch_size;
+				}else{
+					cur_batch = batch_size;
+				}
+				
+				// Picking the batch from the buffer.
+				arma::mat stream_batch = arma::mat(&batch.unsafe_col(pointer)(0), batch.n_rows, cur_batch, false);
+				arma::mat labels_ = arma::mat(&labels.unsafe_col(pointer)(0), labels.n_rows, cur_batch, false);
+				
+				int num_of_cl = (int)labels_.max();
+				if(num_of_cl+1>num_of_classes)
+					num_of_classes = num_of_cl+1;
+				arma::mat stream_labels = arma::zeros<arma::mat>(num_of_classes, labels_.n_cols);
+				for(size_t i=0; i<labels_.n_cols; i++){
+					stream_labels((int)labels_(0,i), i) = 1.;
+				}
+				
+				// Fitting a stream batch to the model.
+				Classifier->fit(stream_batch, stream_labels);
+				
+				pointer += cur_batch;
+				if(pointer==TrainSource->getBufferSize())
+					break;
+				
+			}
+				
+			if(count==1000 || count==1001000 || count%100000==0)
+				getScore(testSet, testResponses);
+			
+			// Get the next 1000 data points from disk to stream them.
+			TrainSource->advance();
+			cout << "count : " << count << endl;
+		}
+		
+		if(con !=1){
+			cout << endl << "#############################################" << endl;
+			cout << "CONCEPT DRIFT HAPPENING KNOW!" << endl;
+			cout << "#############################################" << endl << endl;
+			
+			string train_concept;
+			string test_concept;
+			
+			if(experiment==1 || experiment==4){
+				train_concept = "C5_Train";
+				test_concept = "C5_Test";
+			}else if(experiment==2){
+				train_concept = "C1C2_Train";
+				test_concept = "C1C2_Test";
+			}else if(experiment==3){
+				train_concept = "C2_Train";
+				test_concept = "C2_Test";
+			}
+
+			// Initialize data sources.
+			TrainSource = getPSource<DtTp>("TestFile2.h5",
+										  train_concept,
+										  false);
+			TestSource = getPSource<DtTp>("TestFile2.h5",
+										  test_concept,
+										  false);
+			makeTestDataset();
+		}
+	}
+	cout << endl << "Stream ended." << endl << endl;
+	getScore(testSet, testResponses);
+}
+
+template<typename clsfr, typename DtTp>
+void Extreme_Classification< clsfr, DtTp >::getScore(arma::mat& testbatch, arma::mat& labels){
+	cout << "Accuracy : " << std::setprecision(6) << Classifier->accuracy(testbatch, labels) << "%" << endl;
 }
 
 
@@ -1507,10 +1713,10 @@ protected:
 
 	Json::Value root; // JSON file to read the hyperparameters.  [optional]
 	
-	int epochs; // Number of epochs.
 	arma::mat testSet; // Test dataset for validation of the classification algorithm.
 	arma::mat testResponses; // Arma row vector containing the labels of the evaluation set.
 	double score; // Save the score of the classifier. (To be used later for hyperparameter searching)
+	string experiment; // The learning experimnet to simulate.
 	
 	std::vector<matrix<unsigned char>> training_images;
 	std::vector<unsigned long> training_labels;
@@ -1573,31 +1779,29 @@ LeNet_Classification::LeNet_Classification(string cfg)
 		cfgfile >> root;
 		std::srand (time(NULL));
 		
-		epochs = root["parameters"].get("epochs",-1).asInt64();
-		if(epochs<0){
-			cout << endl << "Incorrect parameter epochs." << endl;
-			cout << "Acceptable epochs parameters : [positive int]" << endl;
-			cout << "Epochs must be in range [1:1e+6]." << endl;
+		experiment = root["experimental_data"].get("experiment", "Null").asString();
+		if(experiment!="exp1" && experiment!="exp2" && experiment!="exp3" && experiment!="exp4" && experiment!="exp5" && experiment!="exp6"){
+			cout << endl << "Incorrect parameter experiment." << endl;
+			cout << "Acceptable experiments are : [exp1, exp2, exp3, exp4, exp5, exp6]" << endl;
 			throw;
 		}
 		
 		size_t testSize = root["parameters"].get("test_size",-1).asInt64();
-		if(epochs<0){
-			cout << endl << "Incorrect parameter epochs." << endl;
-			cout << "Acceptable epochs parameters : [positive int]" << endl;
-			cout << "Epochs must be in range [1:1e+6]." << endl;
+		if(testSize<0){
+			cout << endl << "Incorrect parameter test_size." << endl;
+			cout << "Acceptable test_size parameters : [positive int]" << endl;
 			throw;
 		}
-
+		
 		// Initialize data source.
-		TrainSource = getPSource<double>(root["data"].get("file_name","No file name given").asString(),
-									   root["data"].get("train_dset_name","No file dataset name given").asString(),
-									   false);
+		TrainSource = getPSource<double>(root["experimental_data"].get("file_name", "Null").asString(),
+									     root[experiment].get("train_dset_name", "Null").asString(),
+									     false);
 									   
 		// Initialize data source.
-		TestSource = getPSource<double>(root["data"].get("file_name","No file name given").asString(),
-								      root["data"].get("test_dset_name","No file dataset name given").asString(),
-								      false);
+		TestSource = getPSource<double>(root["experimental_data"].get("file_name", "Null").asString(),
+								        root[experiment].get("test_dset_name", "Null").asString(),
+								        false);
 		
 		testSet = arma::zeros<arma::mat>(TrainSource->getDataSize()-1, testSize); // Test dataset for validation of the classification algorithm.
 		testResponses = arma::zeros<arma::mat>(1, testSize); // Arma row vector containing the labels of the evaluation set.
@@ -1606,7 +1810,7 @@ LeNet_Classification::LeNet_Classification(string cfg)
 		net.printNet();
 		
 	}catch(...){
-		cout << endl << "Something went wrong in Neural Classification object construction." << endl;
+		cout << endl << "Something went wrong in LeNet_Classification object construction." << endl;
 		throw;
 	}
 }
@@ -1645,10 +1849,12 @@ void LeNet_Classification::CreateParams(){
 }
 
 void LeNet_Classification::PrintParams(){
-	cout<<"Change "<<parameters.host()[0]<<endl;
+	cout<<"Change "<<parameters.host()[0] << endl;
 }
 
 void LeNet_Classification::CreateTestSet(){
+	test_images.clear();
+	test_labels.clear();
 	vector<double>& buffer = TestSource->getbuffer(); // Initialize the dataset buffer.
 	while(TestSource->isValid()){
 		for(size_t i=0;i<buffer.size();){
@@ -1670,23 +1876,32 @@ void LeNet_Classification::CreateTestSet(){
 }
 
 void LeNet_Classification::Train(){
-	// Initialize the dataset buffer.
-	vector<double>& buffer = TrainSource->getbuffer(); 
+	
 	std::vector<matrix<unsigned char>> mini_batch_samples;
     std::vector<unsigned long> mini_batch_labels;
 	size_t count = 0;
 	double accuracy = 0;
 	bool init = false;
-	cout << endl << "Size of Streaming Dataset : " << TrainSource->getDatasetLength() << endl << endl;
 	
 	string filename = "/home/aris/Desktop/Diplwmatikh/Starting_Cpp_Developing/Graphs/CentralizedLeNet.csv";
 	std::ofstream myfile;
 	
-	for(size_t ep=0; ep<1; ep++){
+	size_t concepts;
+	if(experiment != "exp1"){
+		concepts = 2;
+	}else{
+		concepts = 1;
+	}
+	
+	for(size_t con=0; con<concepts; con++){
+		// Initialize the dataset buffer.
+		vector<double>& buffer = TrainSource->getbuffer(); 
+		cout << endl << "Size of Streaming Dataset : " << TrainSource->getDatasetLength() << endl << endl;
 		
-		cout << "Starting epoch " << ep+1 << endl;
 		size_t learning_round = 0;
 		while(TrainSource->isValid()){
+			
+			// Converting the data of the buffer to images.
 			training_images.clear();
 			training_labels.clear();
 			for(size_t i=0;i<buffer.size();){
@@ -1704,9 +1919,9 @@ void LeNet_Classification::Train(){
 				training_labels.push_back(label);
 			}
 			
+			// Implementing the batch learning procedure.
 			size_t posit=0;
-			bool done=false;
-			while(posit<training_images.size()&&(!done)){
+			while(posit<training_images.size()){
 				
 				// Create the batch.
 				mini_batch_samples.clear();
@@ -1717,12 +1932,11 @@ void LeNet_Classification::Train(){
 						mini_batch_labels.push_back(training_labels[posit]);
 						posit++;
 					}else{
-						done=true;
 						break;
 					}
 				}
 				
-				// Fit the batch ten times.
+				// Fit the batch.
 				for(size_t fits=0;fits<1;fits++){
 					net.train(mini_batch_samples,mini_batch_labels);
 				}
@@ -1732,46 +1946,49 @@ void LeNet_Classification::Train(){
 				
 				if(!init){
 					CreateParams();
-					//PrintParams();
 					init=true;
 				}
 				
 				// Print info.
-				cout<<endl;
-				if(learning_round%10==0){
-					net.setDropProb(0.);
-					accuracy = net.getAccuracy(test_images,test_labels);
-					net.setDropProb(0.5);
-					//AccuracyHistory.push_back(accuracy);
-	                //DatapointsProcessed.push_back(count);
+				if(learning_round%100==0 || count == 2201000){
+					accuracy = net.getAccuracy(test_images, test_labels, false);
 					myfile.open(filename, std::ios::app);
-					myfile << accuracy << "," << count << "\n";
 					myfile.close();
 				}
-				else{
-					cout << "Accuracy: " << accuracy << endl;	
-				}
-				cout << "Fitted: " << count << endl;
 			}
+			cout << endl;
+			cout << "Accuracy: " << accuracy << endl;
+			cout << "Fitted: " << count << endl;
+			
 			TrainSource->advance();
-			PrintParams();
- 		}
-		TrainSource->rewind();
+		}
 		
-		net.setDropProb(0.);
-		accuracy=net.getAccuracy(test_images,test_labels,false);
-		net.setDropProb(0.5);
-		cout << "Epochs completed " << ep+1 << endl;
-		cout << "Accuracy: " << accuracy << endl;
-		cout << "Dara fitted: " << count << endl;
+		if(con!=1 && concepts==2){
+			cout << endl << "#############################################" << endl;
+			cout << "CONCEPT DRIFT HAPPENING KNOW!" << endl;
+			cout << "#############################################" << endl << endl;
+			
+			// Initialize data source.
+			TrainSource = getPSource<double>(root["experimental_data"].get("file_name", "Null").asString(),
+											 root[experiment].get("train_dset_name_2", "Null").asString(),
+											 false);
+										   
+			// Initialize data source.
+			TestSource = getPSource<double>(root["experimental_data"].get("file_name", "Null").asString(),
+											root[experiment].get("test_dset_name_2", "Null").asString(),
+											false);
+			CreateTestSet();
+		}
 	}
 	
+	accuracy=net.getAccuracy(test_images,test_labels,false);
+	cout << endl << endl << "Experimental stream has ended." << endl;
+	cout << "Accuracy: " << accuracy << endl;
+	cout << "Dara fitted: " << count << endl;
 	
 	//for(size_t i=0;i<AccuracyHistory.size();i++){
 		//myfile << AccuracyHistory.at(i) << "," << DatapointsProcessed.at(i) << "\n";
 	//}
-	
-
 }
 
 } // end of namespace ML_Classification

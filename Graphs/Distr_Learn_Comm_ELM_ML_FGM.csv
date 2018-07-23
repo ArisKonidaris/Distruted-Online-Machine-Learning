@@ -1,0 +1,3 @@
+NetName,DistributedAlgo,Learner,Parameters,Sites,Rounds,Subrounds,Rebalances,Safezones,TotalMsgs,TotalInfoMsgs,TotalBytes,Accuracy,Threshold,BatchSize,Reb_Mult
+net1,dist_algo_net1,ELM,250,4,2588,5865,777,10352,117209,80297,6148443580,97.4885,90000000.000000,64.000000,1
+net1,dist_algo_net1,ELM,250,4,2421,5383,769,9684,108841,74557,5795391404,97.4935,90000000.000000,64.000000,1

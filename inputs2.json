@@ -1,0 +1,152 @@
+{
+	
+	"simulations":{
+		"encoding" : "UTF-8",
+		"net_name_1" : "net1",
+		"net_name_2" : "net2",
+		"number_of_networks" : 1,
+		"learning_problem" : "classification",
+		"negative_labels" : true,
+		"data" : "tests_hdf5_Data",
+		"seed" : -1  // Give any non negative value for random reproducibility
+					 // and any negative value for "completely random results".
+	},
+	
+	"tests_hdf5_Data":{
+		"encoding" : "UTF-8",
+		"batch_size" : 64,
+		"warmup_size" : 64,
+		"test_size" : 20000,
+		"experiment" : 4
+	},
+	
+	"gm_network_net1":{ // format : gm_network_<network_name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 4,
+		"learning_algorithm" : "ELM", // Learning algorithm options : [PA, ELM, MLP, PA_Reg, NN_Reg]
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net2"
+	},
+	
+	"dist_algo_net1":{
+		"algorithm" : "Batch_Learning",
+		"batch_size" : 30
+	},
+	
+	"dist_algo_net2":{
+		"algorithm" : "Michael_Kamp",
+		"threshold" : 90000000,
+		"batch_size" : 64
+	},
+	
+	// This is for neural networks.
+	"dist_algo_net3":{
+		"algorithm" : "Michael_Kamp",
+		"threshold" : 0.08,
+		"batch_size" : 300
+	},
+	
+	"parameters" : {
+		"encoding" : "UTF-8",
+		"regularization" : "l2", // The regularization method. ('none', 'l1', 'l2')
+		"C" : 1e-6, // Regularization/Aggressiveness parameter for training. Default: 0.01
+		//"test_size" : 0.1, // Size of test dataset.
+		"test_size" : 10000, // Size of test dataset.
+		"epochs" : 1, // Number of passes over the data.
+		"negative_labels" : true, // Set the y=0 labels to -1.
+		"kernel" : "poly", // The kernel to be used by the learner.
+		"degree" : 3, // The degree of the polynomial kernel. [optional] default : 2.
+		"offset" : 0.0, // The offset of the polynomial kernel. [optional] default : 0.0.
+		"sigma" : 1.0, // The sigma parameter of the gaussian kernel. [optional] default 1.0. 
+		"a" : 0.5, // Sparce Passive Aggressive parameter a.
+		"b" : 40, // Sparce Passive Aggressive parameter b.
+		"maxSVs" : 2000, // Maximum number of support vectors.
+		"epsilon" : 1e-5 // Regression loss incensitivity 
+    },
+	
+	"data" : {
+		"encoding" : "UTF-8",
+		"file_name" : "TestFile2.h5", // The name of the hdf5 file.
+		"train_dset_name" : "Stream_MNIST_train",
+		"test_dset_name" : "Stream_MNIST_test",
+		"predictions_file_name" : "PA_II_Predictions.csv", // File to save the predictions.
+		"model_file_name" : "PA_II_Model.csv" // File to save the model.
+	},
+
+	"Parameters_Passive_Aggressive_Classifier" : {
+		"encoding" : "UTF-8",
+		"regularization" : "l2", // The regularization method. ('none', 'l1', 'l2')
+		"C" : 1e-6 // Regularization/Aggressiveness parameter for training. Default: 0.01
+    },
+	
+	"Parameters_Passive_Aggressive_Regressor" : {
+		"encoding" : "UTF-8",
+		"regularization" : "l2", // The regularization method. ('none', 'l1', 'l2')
+		"C" : 0.001, // Regularization/Aggressiveness parameter for training. Default: 0.01
+		"test_size" : 0.2, // Size of test dataset.
+		"epochs" : 1, // Number of passes over the data.
+		"epsilon" : 1e-5 // Regression loss insensitivity 
+    },
+
+	"NN_Classifier" : {
+		"encoding" : "UTF-8",
+		"Size_of_input_layer" : 100, // Size of input layer.
+		"Number_of_hidden_layers" : 1, // The number of hidden layers.
+		"hidden1" : 200, // Number of neurons in hidden layer 1.
+		"hidden1_Activation" : "relu", // Activation function for hidden layer 1.
+		"parameter_initialization" : "asdf", // Initialation technique for net parameters.
+		"stepSize" : 0.001, // Learning rate of the optimizer.
+		"batchSize" : 50, // The size of the batch that is to be fed to the Neural Network.  50
+		"beta1" : 0.9, // The beta1 parameter of the Adam optimizer.
+		"beta2" : 0.999, // The beta2 parameter of the Adam optimizer.
+		"eps" : 1e-8, // Epsilon of the optimizer.
+		"maxIterations" : 100, // Maximum iterations of the optimizer.   
+		"tolerance" : 1e-5 // Tolerance of the optimizer.
+	},
+	
+	"NN1_Classifier" : {
+		"encoding" : "UTF-8",
+		"Size_of_input_layer" : 18, // Size of input layer.
+		"Number_of_hidden_layers" : 4, // The number of hidden layers.
+		"hidden1" : 300, // Number of neurons in hidden layer 1.
+		"hidden1_Activation" : "tanh", // Activation function for hidden layer 1.
+		"hidden2" : 300, // Number of neurons in hidden layer 2.
+		"hidden2_Activation" : "tanh", // Activation function for hidden layer 2.
+		"hidden3" : 300, // Number of neurons in hidden layer 3.
+		"hidden3_Activation" : "tanh", // Activation function for hidden layer 3.
+		"hidden4" : 300, // Number of neurons in hidden layer 4.
+		"hidden4_Activation" : "tanh", // Activation function for hidden layer 4.
+		"parameter_initialization" : "asdf", // Initialation technique for net parameters.
+		"stepSize" : 0.05, // Learning rate of the optimizer.
+		"batchSize" : 100, // The size of the batch that is to be fed to the Neural Network.  50
+		"beta1" : 0.9, // The beta1 parameter of the Adam optimizer.
+		"beta2" : 0.999, // The beta2 parameter of the Adam optimizer.
+		"eps" : 1e-8, // Epsilon of the optimizer.
+		"maxIterations" : 1000, // Maximum iterations of the optimizer.   100
+		"tolerance" : 1e-5, // Tolerance of the optimizer.
+		"trsmt_mv_avrgs" : false
+	},
+	
+	"NN_Regressor" : {
+		"encoding" : "UTF-8",
+		"Size_of_input_layer" : 100, // Size of input layer.
+		"Number_of_hidden_layers" : 1, // The number of hidden layers.
+		"hidden1" : 200, // Number of neurons in hidden layer 1.
+		"hidden1_Activation" : "logistic", // Activation function for hidden layer 1.
+		"parameter_initialization" : "asdf", // Initialation technique for net parameters.
+		"stepSize" : 0.001, // Learning rate of the optimizer.
+		"batchSize" : 1, // The size of the batch that is to be fed to the Neural Network.
+		"beta1" : 0.9, // The beta1 parameter of the Adam optimizer.
+		"beta2" : 0.999, // The beta2 parameter of the Adam optimizer.
+		"eps" : 1e-8, // Epsilon of the optimizer.
+		"maxIterations" : 1, // Maximum iterations of the optimizer.
+		"tolerance" : 1e-8 // Tolerance of the optimizer.
+	},
+
+	"ELM" : {
+		"encoding" : "UTF-8",
+		"batch_size" : 64,
+		"neurons" : 250
+	}
+
+}

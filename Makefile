@@ -12,15 +12,15 @@ endif
 
 DLIB_INCLUDE = -I/usr/local/include
 DLIB_INCLUDE += -I/usr/local/cuda-9.0/include
-DLIB_LIB = -L/usr/local/lib -ldlib -lpthread -lX11 -lblas -llapack
+DLIB_LIB = -L/usr/local/lib -ldlib -lpthread -lX11 -lblas -llapack -lpng16 -lz
 DLIB_LIB += -L/usr/local/cuda-9.0/lib64 -lcuda -lcudart -lcusolver -lcudnn -ldl -lrt -lcublas -lcurand -lcusolver -lstdc++ -lm -lgcc_s -lc -fopenmp
 DLIB_LIB += -L/usr/include/opencv2 -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio -lopencv_imgcodecs
 DLIB_LIB += -L/usr/lib/gcc/x86_64-linux-gnu/7 -lgomp
 
 #TENSOR_INCLUDE = -I/usr/local/include/eigen3
-#TENSOR_INCLUDE += -I/home/user/standalone/include/third_party
-#TENSOR_INCLUDE += -I/home/user/standalone/include
-#TENSOR_INCLUDE += -I/home/user/standalone/include/nsync/public/
+#TENSOR_INCLUDE += -I/home/aris/standalone/include/third_party
+#TENSOR_INCLUDE += -I/home/aris/standalone/include
+#TENSOR_INCLUDE += -I/home/aris/standalone/include/nsync/public/
 #TENSOR_LIB:= -lprotobuf -pthread -lpthread -ltensorflow_cc -ltensorflow_framework
 
 MLPACK_INCLUDE:= -I/path/to/mlpack/build/include
@@ -32,10 +32,10 @@ HDF5_INCLUDE:= -I/usr/include/hdf5/serial
 HDF5_LIB:= -L/usr/lib/x86_64-linux-gnu/hdf5/serial \
 -lhdf5_hl_cpp -lhdf5_cpp -lhdf5_hl -lhdf5_serial -ldl -laec -lsz -lz
 
-VSAM_INCLUDE:= -I/home/user/Desktop/Diplwmatikh/ddssim/cpp/
+VSAM_INCLUDE:= -I/home/aris/Desktop/Diplwmatikh/ddssim/cpp/
 
-PYTHON_INCLUDE:= $(shell /home/user/anaconda3/bin/python3-config --includes)
-PYTHON_LIB:= $(shell /home/user/anaconda3/bin/python3-config --ldflags)
+PYTHON_INCLUDE:= $(shell /home/aris/anaconda3/bin/python3-config --includes)
+PYTHON_LIB:= $(shell /home/aris/anaconda3/bin/python3-config --ldflags)
 
 INCLUDE = $(PYTHON_INCLUDE) $(HDF5_INCLUDE) $(MLPACK_INCLUDE) $(VSAM_INCLUDE) $(DLIB_INCLUDE)
 LIB = $(ARMA_LIB) $(MLPACK_LIB) $(HDF5_LIB) $(DLIB_LIB) -lm -ljsoncpp  #-lboost_filesystem -lboost_system -lcblas -lclapack -llibf2c
@@ -66,14 +66,15 @@ endif
 # File lists
 ###################################
 
-DDS_SOURCES = relative/path/to/ddssim/cpp/hdv.cc relative/path/to/ddssim/cpp/dds.cc relative/path/to/ddssim/cpp/output.cc relative/path/to/ddssim/cpp/eca.cc \
-	relative/path/to/ddssim/cpp/agms.cc relative/path/to/ddssim/cpp/data_source.cc relative/path/to/ddssim/cpp/method.cc relative/path/to/ddssim/cpp/cfgfile.cc \
-	relative/path/to/ddssim/cpp/dsarch.cc relative/path/to/ddssim/cpp/accurate.cc relative/path/to/ddssim/cpp/query.cc relative/path/to/ddssim/cpp/results.cc \
-	relative/path/to/ddssim/cpp/sz_quorum.cc relative/path/to/ddssim/cpp/sz_bilinear.cc relative/path/to/ddssim/cpp/tods.cc relative/path/to/ddssim/cpp/safezone.cc \
-	relative/path/to/ddssim/cpp/gm_proto.cc relative/path/to/ddssim/cpp/gm_szone.cc relative/path/to/ddssim/cpp/gm_query.cc relative/path/to/ddssim/cpp/fgm.cc \
-	relative/path/to/ddssim/cpp/sgm.cc relative/path/to/ddssim/cpp/frgm.cc
+DDS_SOURCES = ../ddssim/cpp/hdv.cc ../ddssim/cpp/dds.cc ../ddssim/cpp/output.cc ../ddssim/cpp/eca.cc \
+	../ddssim/cpp/agms.cc ../ddssim/cpp/data_source.cc ../ddssim/cpp/method.cc ../ddssim/cpp/cfgfile.cc \
+	../ddssim/cpp/dsarch.cc ../ddssim/cpp/accurate.cc ../ddssim/cpp/query.cc ../ddssim/cpp/results.cc \
+	../ddssim/cpp/sz_quorum.cc ../ddssim/cpp/sz_bilinear.cc ../ddssim/cpp/tods.cc ../ddssim/cpp/safezone.cc \
+	../ddssim/cpp/gm_proto.cc ../ddssim/cpp/gm_szone.cc ../ddssim/cpp/gm_query.cc ../ddssim/cpp/fgm.cc \
+	../ddssim/cpp/sgm.cc ../ddssim/cpp/frgm.cc
 
-ML_SOURCES = data_structures.cc dsource.cc Machine_Learning.cc ML_GM_Proto.cc ML_GM_Networks.cc DL_GM_Networks.cc feeders.cc
+ML_SOURCES = data_structures.cc dsource.cc Machine_Learning.cc ML_GM_Proto.cc \
+	ML_GM_Networks.cc ML_FGM_Networks.cc DL_GM_Networks.cc DL_FGM_Networks.cc feeders.cc
 DDS_ML_SOURCES = $(DDS_SOURCES) $(ML_SOURCES)
 ML_OBJ = $(ML_SOURCES:.cc=.o)
 
