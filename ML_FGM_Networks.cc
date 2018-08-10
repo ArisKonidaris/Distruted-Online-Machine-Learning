@@ -210,11 +210,6 @@ oneway coordinator::real_drift(sender<node_t> ctx, int_num cols){
 	query->GlobalModel.at(1) += *global_learner->getModel().at(1);
 }
 
-double coordinator::getAccuracy(){
-	query->accuracy = Q->queryAccuracy(global_learner);
-	return query->accuracy;
-}
-
 void coordinator::Progress(){
 	// Query thr accuracy of the global model.
 	if(Q->config.learning_algorithm == "ELM"){
@@ -228,6 +223,11 @@ void coordinator::Progress(){
 	cout << "Number of rebalances : " << num_rebalances << endl;
 	cout << "Total updates : " << total_updates << endl;
 	cout << endl;
+}
+
+double coordinator::getAccuracy(){
+	query->accuracy = Q->queryAccuracy(global_learner);
+	return query->accuracy;
 }
 
 vector<size_t>  coordinator::Statistics() const{

@@ -9,6 +9,7 @@
 		"learning_problem" : "classification",
 		"data" : "tests_hdf5_Data",
 		"stream_distribution" : "Stream_Distribution1",
+		"log_diff_acc" : false,
 		"seed" : -1 // Give any non negative value for random reproducibility
 					// and any negative value for "completely random results".
 	},
@@ -82,7 +83,7 @@
 	"dist_algo_net4":{
 		"algorithm" : "Michael_Kamp", // Michael_Kamp
 		"precision" : 0.01,
-		"reb_mult" : 1.0, // Give a positive value only for relancing
+		"reb_mult" : 1.0, // Give a positive value only for rebalancing
 		"threshold" : 0.008,
 		"batch_size" : 64
 	},

@@ -460,8 +460,8 @@ float Param_Variance_safezone_func::Zeta(const vector<tensor*>& mdl) const
 	for(size_t i=0;i<mdl.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(mdl.at(i)->num_samples(), mdl.at(i)->k(), mdl.at(i)->nr(), mdl.at(i)->nc());
-		//dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
-		dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
+		dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
+		//dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
 		res+=dot(subtr,subtr);
 	}
 	return std::sqrt(threshold)-std::sqrt(res);
@@ -473,8 +473,8 @@ float Param_Variance_safezone_func::Zeta(const vector<resizable_tensor*>& mdl) c
 	for(size_t i=0;i<mdl.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(mdl.at(i)->num_samples(), mdl.at(i)->k(), mdl.at(i)->nr(), mdl.at(i)->nc());
-		//dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
-		dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
+		dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
+		//dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
 		res+=dot(subtr,subtr);
 	}
 	return std::sqrt(threshold)-std::sqrt(res);
@@ -491,8 +491,8 @@ float Param_Variance_safezone_func::checkIfAdmissible(const vector<tensor*>& mdl
 	for(size_t i=0;i<mdl.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(mdl.at(i)->num_samples(), mdl.at(i)->k(), mdl.at(i)->nr(), mdl.at(i)->nc());
-		//dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
-		dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
+		dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
+		//dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
 		res+=dot(subtr,subtr);
 	}
 	return threshold-res;
@@ -504,8 +504,8 @@ float Param_Variance_safezone_func::checkIfAdmissible(const vector<resizable_ten
 	for(size_t i=0;i<mdl.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(mdl.at(i)->num_samples(), mdl.at(i)->k(), mdl.at(i)->nr(), mdl.at(i)->nc());
-		//dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
-		dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
+		dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
+		//dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
 		res+=dot(subtr,subtr);
 	}
 	return threshold-res;
@@ -517,8 +517,8 @@ float Param_Variance_safezone_func::checkIfAdmissible(const vector<tensor*>& par
 	for(size_t i=0;i<par1.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(par2.at(i)->num_samples(), par2.at(i)->k(), par2.at(i)->nr(), par2.at(i)->nc());
-		//dlib::cpu::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1., 0.);
-		dlib::cuda::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1.);
+		dlib::cpu::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1., 0.);
+		//dlib::cuda::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1.);
 		res+=dot(subtr,subtr);
 	}
 	return std::sqrt(threshold)-std::sqrt(res);
@@ -616,9 +616,8 @@ void dl_query_state::initializeGlobalModel(const vector<tensor*>& mdl){
 
 void dl_query_state::update_estimate(vector<resizable_tensor*>& mdl){
 	for(size_t i=0;i<GlobalModel.size();i++){
-		//dlib:memcpy(*GlobalModel.at(i), *mdl.at(i));
-		//dlib::cpu::affine_transform(*GlobalModel.at(i), *mdl.at(i), 1., 0.);
-		dlib::cuda::affine_transform(*GlobalModel.at(i), *mdl.at(i), 1.);
+		dlib::cpu::affine_transform(*GlobalModel.at(i), *mdl.at(i), 1., 0.);
+		//dlib::cuda::affine_transform(*GlobalModel.at(i), *mdl.at(i), 1.);
 	}
 }
 

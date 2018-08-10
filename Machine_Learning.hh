@@ -378,17 +378,17 @@ namespace DLIB_Classification{
 
 template<typename feats, typename lbs>
 class LeNet : public DLIB_Learner<feats,lbs> {
-	typedef std::vector<matrix<feats>> input_features;
-	typedef std::vector<lbs> input_labels;
-	
-	using trnet = loss_multiclass_log<relu<fc<10,
-								  dropout<relu<fc<256,
-								  max_pool<2,2,2,2,
-								  relu<add_layer<con_<64,5,5,1,1,2,2>,
-								  max_pool<2,2,2,2,
-								  relu<add_layer<con_<32,5,5,1,1,2,2>,
-								  input<matrix<feats>>
-								  >>>>>>>>>>>>;
+typedef std::vector<matrix<feats>> input_features;
+typedef std::vector<lbs> input_labels;
+
+using trnet = loss_multiclass_log<relu<fc<10,
+							  dropout<relu<fc<256,
+							  max_pool<2,2,2,2,
+							  relu<add_layer<con_<64,5,5,1,1,2,2>,
+							  max_pool<2,2,2,2,
+							  relu<add_layer<con_<32,5,5,1,1,2,2>,
+							  input<matrix<feats>>
+							  >>>>>>>>>>>>;
 public:
 	
 	// Default constructor.

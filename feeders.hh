@@ -76,6 +76,7 @@ protected:
 	size_t msgs;
 	size_t bts;
 	vector<vector<double>> differential_accuracy;
+	bool log_diff_acc;
 	
 public:
 	/** 	
@@ -166,6 +167,9 @@ feeder<distrNetType>::feeder(string cfg)
 			throw;
 		}
 	}
+	
+	// Boolean flag to determine if the experiment will log the differential accuracies.
+	log_diff_acc = root["simulations"].get("log_diff_acc",false).asBool();
 	
 }
 
@@ -288,7 +292,8 @@ void feeder<distrNetType>::gatherDifferentialInfo() {
 		msgs = batch_messages;
 		bts = batch_bytes;
 		
-		//differential_accuracy.at(i).push_back(_net_container.at(i)->hub->getAccuracy());
+		if(log_diff_acc)
+			differential_accuracy.at(i).push_back(_net_container.at(i)->hub->getAccuracy());
 	}
 }
 
@@ -1138,12 +1143,14 @@ void HDF5_Drift_Feeder<distrNetType>::TrainNetworks(){
 				myfile2 << ",";
 		}
 		myfile2 << "\n";
-//		for(size_t inf_ind=0; inf_ind<differential_accuracy.at(net).size(); inf_ind++){
-//			myfile2 << differential_accuracy.at(net).at(inf_ind);
-//			if(inf_ind<differential_accuracy.at(net).size()-1)
-//				myfile2 << ",";
-//		}
-//		myfile2 << "\n";
+		if(this->log_diff_acc){
+			for(size_t inf_ind=0; inf_ind<this->differential_accuracy.at(net).size(); inf_ind++){
+				myfile2 << this->differential_accuracy.at(net).at(inf_ind);
+				if(inf_ind<this->differential_accuracy.at(net).size()-1)
+					myfile2 << ",";
+			}
+			myfile2 << "\n";
+		}
 		myfile2.close();
 		
 	}
@@ -1261,6 +1268,7 @@ protected:
 	size_t msgs;
 	size_t bts;
 	vector<vector<double>> differential_accuracy;
+	bool log_diff_acc;
 	
 public:
 	/** 	
@@ -1339,6 +1347,9 @@ config_file(cfg){
 			throw;
 		}
 	}
+	
+	// Boolean flag to determine if the experiment will log the differential accuracies.
+	log_diff_acc = root["simulations"].get("log_diff_acc",false).asBool();
 	
 }
 
@@ -1542,18 +1553,17 @@ void LeNet_Feeder<feats,lb,distrNetType>::gatherDifferentialInfo(){
 			batch_bytes += chnl->bytes_received();
 		}
 		
-		size_t dif1 = batch_messages - this->msgs;
 		this->differential_communication.at(i).at(0)
 								        .push_back( batch_messages - this->msgs );
 		
-		size_t dif2 = batch_bytes - this->bts;
 		this->differential_communication.at(i).at(1)
 								        .push_back( batch_bytes - this->bts  );
 								  
 		this->msgs = batch_messages;
 		this->bts = batch_bytes;
 		
-		//differential_accuracy.at(i).push_back(_net_container.at(i)->hub->getAccuracy());
+		if(this->log_diff_acc)
+			this->differential_accuracy.at(i).push_back(this->_net_container.at(i)->hub->getAccuracy());
 	}
 }
 
@@ -1632,7 +1642,6 @@ void LeNet_Feeder<feats,lb,distrNetType>::TrainNetworks(){
 				if(training_images.size() <= this->warmupSize-degrees){ // A part of the warmup dataset is on the buffer.
 					degrees += training_images.size();
 					size_t posit1=0;
-					bool done1=false;
 					while(posit1<training_images.size()){
 						mini_batch_samples.clear();
 						mini_batch_labels.clear();
@@ -1655,7 +1664,6 @@ void LeNet_Feeder<feats,lb,distrNetType>::TrainNetworks(){
 					continue;
 				}else{ // The last chunk of the warmup dataset.
 					size_t posit1=0;
-					bool done1=false;
 					while(posit1<(this->warmupSize-degrees)){
 						mini_batch_samples.clear();
 						mini_batch_labels.clear();
@@ -1785,14 +1793,17 @@ void LeNet_Feeder<feats,lb,distrNetType>::TrainNetworks(){
 				myfile2 << ",";
 		}
 		myfile2 << "\n";
-//		for(size_t inf_ind=0; inf_ind<this->differential_accuracy.at(net).size(); inf_ind++){
-//			myfile2 << this->differential_accuracy.at(net).at(inf_ind);
-//			if(inf_ind < this->differential_accuracy.at(net).size()-1)
-//				myfile2 << ",";
-//		}
-//		myfile2 << "\n";
 		myfile2.close();
 		
+		if(this->log_diff_acc){
+			for(size_t inf_ind=0; inf_ind<this->differential_accuracy.at(net).size(); inf_ind++){
+				myfile2 << this->differential_accuracy.at(net).at(inf_ind);
+				if(inf_ind < this->differential_accuracy.at(net).size()-1)
+					myfile2 << ",";
+			}
+			myfile2 << "\n";
+		}
+		myfile2.close();
 	}
 	count = 0;
 	TrainSource->rewind();
@@ -1801,12 +1812,6 @@ void LeNet_Feeder<feats,lb,distrNetType>::TrainNetworks(){
 
 template<typename feats, typename lbs, template<typename,typename> typename distrNetType>
 void LeNet_Feeder<feats,lbs,distrNetType>::Train(std::vector<matrix<feats>>& batch, std::vector<lbs>& labels){
-//	for(auto net:this->_net_container){
-//		// Picking a random node to train.
-//		size_t random_node = std::rand()%(net->sites.size());
-//		// Train on data point/batch.
-//		net->process_record(random_node, batch, labels);
-//	}
 	auto net_dist_it = this->net_dists.begin();
 	for(auto net : this->_net_container){
 		size_t random_node;

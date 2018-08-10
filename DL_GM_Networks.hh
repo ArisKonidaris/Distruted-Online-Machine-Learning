@@ -92,6 +92,9 @@ struct coordinator : process
 	// Printing and saving the accuracy.
 	void Progress();
 	
+	// Getting the accuracy of the global learner.
+	double getAccuracy();
+	
 	// Get the communication statistics of experiment.
 	vector<size_t> Statistics() const;
 	
@@ -140,14 +143,14 @@ oneway coordinator<feat,lb>::local_violation(sender<node_t> ctx, dl_model_state<
 	
 	B.clear(); // Clear the balanced nodes set.
 	for(auto layer:Mean){ // Clear the mean global model.
-		//dlib::cpu::affine_transform(*layer, *layer, 0., 0.); // Clear the mean global model.
-		dlib::cuda::affine_transform(*layer, *layer, 0.); // Clear the mean global model.
+		dlib::cpu::affine_transform(*layer, *layer, 0., 0.); // Clear the mean global model.
+		//dlib::cuda::affine_transform(*layer, *layer, 0.); // Clear the mean global model.
 	}
 	cnt = 1;
 	
 	for(size_t i=0;i<up._model.size();i++){
-		//dlib::cpu::add(*Mean.at(i),*Mean.at(i),*up._model.at(i));
-		dlib::cuda::add(1.,*Mean.at(i),1.,*up._model.at(i));
+		dlib::cpu::add(*Mean.at(i),*Mean.at(i),*up._model.at(i));
+		//dlib::cuda::add(1.,*Mean.at(i),1.,*up._model.at(i));
 	}
 	total_updates += up.updates;
 	
@@ -170,8 +173,8 @@ void coordinator<feat,lb>::fetch_updates(node_t* node){
 	if( std::abs(safe_zone->checkIfAdmissible(up._model)-safe_zone->hyperparameters.at(0)) > 1e-6 ){
 		cnt++;
 		for(size_t i=0;i<up._model.size();i++){
-			//dlib::cpu::add(*Mean.at(i), *Mean.at(i), *up._model.at(i));
-			dlib::cuda::add(1.,*Mean.at(i),1.,*up._model.at(i));
+			dlib::cpu::add(*Mean.at(i), *Mean.at(i), *up._model.at(i));
+			//dlib::cuda::add(1.,*Mean.at(i),1.,*up._model.at(i));
 		}
 	}
 	total_updates += up.updates;
@@ -187,8 +190,8 @@ void coordinator<feat,lb>::finish_round(node_t* nf) {
 			fetch_updates(n);
 	}
 	for(auto layer:Mean){
-		//dlib::cpu::affine_transform(*layer, *layer, std::pow(cnt,-1), 0.);
-		dlib::cuda::affine_transform(*layer, *layer, std::pow(cnt,-1));
+		dlib::cpu::affine_transform(*layer, *layer, std::pow(cnt,-1), 0.);
+		//dlib::cuda::affine_transform(*layer, *layer, std::pow(cnt,-1));
 	}
 
 	// New round
@@ -230,14 +233,14 @@ void coordinator<feat,lb>::Kamp_Rebalance(node_t* lvnode){
 		fetch_updates(n);
 		B.insert(n);
 		for(auto layer:Mean){
-			//dlib::cpu::affine_transform(*layer, *layer, std::pow(cnt,-1), 0.);
-			dlib::cuda::affine_transform(*layer, *layer, std::pow(cnt, -1));
+			dlib::cpu::affine_transform(*layer, *layer, std::pow(cnt,-1), 0.);
+			//dlib::cuda::affine_transform(*layer, *layer, std::pow(cnt, -1));
 		}
 		if(safe_zone->checkIfAdmissible(Mean) > 0. || B.size() == k )
 			break;
 		for(auto layer:Mean){
-			//dlib::cpu::affine_transform(*layer, *layer, cnt, 0.);
-			dlib::cuda::affine_transform(*layer, *layer, cnt);
+			dlib::cpu::affine_transform(*layer, *layer, cnt, 0.);
+			//dlib::cuda::affine_transform(*layer, *layer, cnt);
 		}
 	}
 	
@@ -272,6 +275,12 @@ void coordinator<feat,lb>::Progress(){
 	cout << "Number of subrounds : " << num_subrounds << endl;
 	cout << "Total updates : " << total_updates << endl;
 	cout << endl;
+}
+
+template<typename feat,typename lb>
+double coordinator<feat,lb>::getAccuracy(){
+	query->accuracy = Q->queryAccuracy(global_learner);
+	return query->accuracy;
 }
 
 template<typename feat,typename lb>
@@ -343,9 +352,8 @@ void coordinator<feat,lb>::warmup(std::vector<matrix<feat>>& batch, std::vector<
 template<typename feat,typename lb>
 void coordinator<feat,lb>::end_warmup(){
 	for(size_t i=0;i<Mean.size();i++){
-		//dlib:memcpy(*Mean.at(i), *global_learner->Parameters().at(i));
-		//dlib::cpu::affine_transform(*Mean.at(i), *global_learner->Parameters().at(i), 1., 0.);
-		dlib::cuda::affine_transform(*Mean.at(i), *global_learner->Parameters().at(i), 1.);
+		dlib::cpu::affine_transform(*Mean.at(i), *global_learner->Parameters().at(i), 1., 0.);
+		//dlib::cuda::affine_transform(*Mean.at(i), *global_learner->Parameters().at(i), 1.);
 	}
 	query->update_estimate(Mean);
 	start_round();
