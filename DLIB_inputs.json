@@ -85,7 +85,7 @@
 		"precision" : 0.01,
 		"reb_mult" : 1.0, // Give a positive value only for rebalancing
 		"threshold" : 0.008,
-		"batch_size" : 64
+		"batch_size" : 128
 	},
 
 	"dist_algo_net5":{

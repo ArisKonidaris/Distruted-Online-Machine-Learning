@@ -3,5 +3,6 @@
 *.a
 *.h5
 *.txt
-Graphs/
+Graphs/*
+MNIST_Data/*
 .depend

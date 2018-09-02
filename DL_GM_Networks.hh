@@ -461,8 +461,8 @@ struct learning_node : local_site {
 
 template<typename feat,typename lb>
 oneway learning_node<feat,lb>::reset(const dl_safezone& newsz){
+	datapoints_seen = 0;
 	szone = newsz;       // Reset the safezone object
-	datapoints_seen = 0; // Reset the drift vector
 	_learner->update_model(szone.getSZone()->getGlobalModel()); // Updates the parameters of the local learner
 }
 
@@ -474,7 +474,6 @@ dl_model_state<tensor> learning_node<feat,lb>::get_drift(){
 
 template<typename feat,typename lb>
 void learning_node<feat,lb>::set_drift(tensor_message mdl){
-//void learning_node<feat,lb>::set_drift(dl_model_state mdl){
 	// Update the local learner with the model sent by the coordinator
 	_learner->update_model(mdl._model);
 }
@@ -483,9 +482,7 @@ template<typename feat,typename lb>
 void learning_node<feat,lb>::update_stream(std::vector<matrix<feature_t>>& batch, std::vector<label_t>& labels){
 	_learner->fit(batch,labels);
 	datapoints_seen += batch.size();
-	
 	if( dl_safezone_function* entity = dynamic_cast<Param_Variance_safezone_func*>(szone.getSZone()) ){
-		//size_t ch = szone(datapoints_seen);
 		if(szone(datapoints_seen) <= 0){
 			datapoints_seen = 0;
 			if(szone(_learner->Parameters())<0.){

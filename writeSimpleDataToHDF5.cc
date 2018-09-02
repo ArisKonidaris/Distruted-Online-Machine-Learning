@@ -37,7 +37,8 @@ const int BUFFER_SIZE(4<<20); // The size (in bytes) of the file stream buffer.
 
 const int RANK = 2; // Number of dimensions of dataspace.
 const int DATA_SIZE = NUM_OF_FEATS + 2;
-const H5std_string FILE_NAME("Experimental_Datasets.h5"); // Name of hdf5 file.
+const H5std_string FILE_NAME("AUG_MNIST.h5"); // Name of hdf5 file.
+//const H5std_string FILE_NAME("Experimental_Datasets.h5"); // Name of hdf5 file.
 //const H5std_string DATASET_NAME("Linear50"); // Name of dataset.
 //const H5std_string DATASET_NAME("Linear5000"); // Name of dataset.
 //const H5std_string DATASET_NAME("Linear600000"); // Name of dataset.
@@ -51,10 +52,10 @@ const H5std_string FILE_NAME("Experimental_Datasets.h5"); // Name of hdf5 file.
 //const H5std_string DATASET_NAME("C3_Train"); // Name of dataset.
 //const H5std_string DATASET_NAME("C4_Train"); // Name of dataset.
 //const H5std_string DATASET_NAME("C5_Train"); // Name of dataset.
-//const H5std_string DATASET_NAME("MNIST_Test"); // Name of dataset.
+const H5std_string DATASET_NAME("MNIST_Test"); // Name of dataset.
 //const H5std_string DATASET_NAME("NMNIST_Test"); // Name of dataset.
 //const H5std_string DATASET_NAME("C1_Test"); // Name of dataset.
-const H5std_string DATASET_NAME("C2_Test"); // Name of dataset.
+//const H5std_string DATASET_NAME("C2_Test"); // Name of dataset.
 //const H5std_string DATASET_NAME("C1C2_Test"); // Name of dataset.
 //const H5std_string DATASET_NAME("C3_Test"); // Name of dataset.
 //const H5std_string DATASET_NAME("C4_Test"); // Name of dataset.
@@ -116,7 +117,7 @@ int main(void){
 		//myfile.open("linear_dataset600000.txt"); // Opening dataset file.
 		//myfile.open("linear_dataset1000000.txt"); // Opening dataset file.
 		//myfile.open("MNIST_train.txt"); // Opening dataset file.
-		//myfile.open("AMNIST.txt"); // Opening dataset file.
+		//myfile.open("AMNIST_.txt"); // Opening dataset file.
 		//myfile.open("NAMNIST.txt"); // Opening dataset file.
 		//myfile.open("C1_Train.txt"); // Opening dataset file.
 		//myfile.open("C2_Train.txt"); // Opening dataset file.
@@ -124,10 +125,10 @@ int main(void){
 		//myfile.open("C3_Train.txt"); // Opening dataset file.
 		//myfile.open("C4_Train.txt"); // Opening dataset file.
 		//myfile.open("C5_Train.txt"); // Opening dataset file.
-		//myfile.open("MNIST_test.txt"); // Opening dataset file.
+		myfile.open("MNIST_test.txt"); // Opening dataset file.
 		//myfile.open("NMNIST_test.txt"); // Opening dataset file.
 		//myfile.open("C1_Test.txt"); // Opening dataset file.
-		myfile.open("C2_Test.txt"); // Opening dataset file.
+		//myfile.open("C2_Test.txt"); // Opening dataset file.
 		//myfile.open("C1C2_Test.txt"); // Opening dataset file.
 		//myfile.open("C3_Test.txt"); // Opening dataset file.
 		//myfile.open("C4_Test.txt"); // Opening dataset file.

@@ -420,6 +420,7 @@ struct learning_node : local_site {
 	vector<resizable_tensor*> E_Delta;
 
 	int num_sites;			             // Number of sites.
+	size_t datapoints_seen;              // Number of points the node has seen since the last synchronization.
 	coord_proxy_t coord;                 // The proxy of the coordinator/hub.
 	
 	int counter;                         // The counter used by the FGM protocol.
@@ -464,7 +465,8 @@ struct learning_node : local_site {
 
 template<typename feat,typename lb>
 oneway learning_node<feat,lb>::reset(const dl_safezone& newsz, const float_value qntm){
-	counter = 0;
+	datapoints_seen = 0;
+	counter = 0;                                                      // Reset the counter
 	szone = newsz;                                                    // Reset the safezone object
 	quantum = 1.*qntm.value;                                          // Reset the quantum
 	_learner->update_model(szone.getSZone()->getGlobalModel());       // Updates the parameters of the local learner
@@ -516,11 +518,15 @@ float_value learning_node<feat,lb>::get_zed_value(){
 template<typename feat,typename lb>
 void learning_node<feat,lb>::update_stream(std::vector<matrix<feature_t>>& batch, std::vector<label_t>& labels){
 	_learner->fit(batch,labels);
+	datapoints_seen += batch.size();
 	if( dl_safezone_function* entity = dynamic_cast<Param_Variance_safezone_func*>(szone.getSZone()) ){
-		int c_now = std::floor((zeta-szone(_learner->Parameters(), E_Delta))/quantum);
-		if(c_now-counter>0){
-			coord.send_increment(increment(c_now-counter));
-			counter = c_now;
+		if(szone(datapoints_seen) <= 0){
+			datapoints_seen = 0;
+			int c_now = std::floor((zeta-szone(_learner->Parameters(), E_Delta))/quantum);
+			if(c_now-counter>0){
+				coord.send_increment(increment(c_now-counter));
+				counter = c_now;
+			}
 		}
 	}
 }

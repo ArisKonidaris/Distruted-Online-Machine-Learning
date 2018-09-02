@@ -560,6 +560,7 @@ inline vector<arma::SizeMat> PassiveAgressiveRegression::modelDimensions() const
 	Neural Network Regressor
 *********************************************/
 
+/*
 NN_Regressor::NN_Regressor(string cfg, string net_name)
 :MLPACK_Learner(){
 	try{
@@ -740,3 +741,5 @@ inline vector<arma::SizeMat> NN_Regressor::modelDimensions() const {
 		md_size.push_back(arma::size(*param));
 	return md_size; 
 }
+
+*/

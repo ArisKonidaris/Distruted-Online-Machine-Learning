@@ -277,8 +277,8 @@ void coordinator::initializeLearner(){
 		global_learner = new MLP_Classifier(cfg().cfgfile, cfg().network_name);
 	}else if(cfg().learning_algorithm == "PA_Reg"){
 		global_learner = new PassiveAgressiveRegression(cfg().cfgfile, cfg().network_name);
-	}else if(cfg().learning_algorithm == "NN_Reg"){
-		global_learner = new NN_Regressor(cfg().cfgfile, cfg().network_name);
+//	}else if(cfg().learning_algorithm == "NN_Reg"){
+//		global_learner = new NN_Regressor(cfg().cfgfile, cfg().network_name);
 	}
 	if(cfg().learning_algorithm != "ELM")
 		global_learner->initializeModel(Q->testSet->n_rows);
@@ -392,8 +392,8 @@ void learning_node::initializeLearner(){
 		_learner = new MLP_Classifier(cfg().cfgfile, cfg().network_name);
 	}else if(cfg().learning_algorithm == "PA_Reg"){
 		_learner = new PassiveAgressiveRegression(cfg().cfgfile, cfg().network_name);
-	}else if(cfg().learning_algorithm == "NN_Reg"){
-		_learner = new NN_Regressor(cfg().cfgfile, cfg().network_name);
+//	}else if(cfg().learning_algorithm == "NN_Reg"){
+//		_learner = new NN_Regressor(cfg().cfgfile, cfg().network_name);
 	}
 	if(cfg().learning_algorithm != "ELM")
 		_learner->initializeModel(Q->testSet->n_rows);
