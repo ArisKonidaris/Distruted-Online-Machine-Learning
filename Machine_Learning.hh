@@ -82,7 +82,8 @@ public:
 	virtual arma::mat predict(const arma::mat& point) const { return nullptr; }
 	//virtual inline arma::mat& getModel() { return _model; }
 	virtual inline vector<arma::mat*>& getModel() { return vector_model; }
-	virtual inline vector<arma::mat*>& getHModel() { vector<arma::mat*> empt_vec; return empt_vec; }
+//	virtual inline vector<arma::mat*>& getHModel() { vector<arma::mat*> empt_vec; return empt_vec; }
+    virtual inline vector<arma::mat*>& getHModel() { throw; }
 	virtual inline void restoreModel(const vector<arma::mat*>& params) { }
 	virtual inline double accuracy(const arma::mat& testbatch, const arma::mat& labels) const { return 0.; }
 	virtual inline size_t byte_size() const { return 0; }
@@ -233,7 +234,7 @@ public:
 /*********************************************
 	Multi Layer Perceptron Classifier
 *********************************************/
-
+/*
 class MLP_Classifier : public MLPACK_Learner {
 protected:
 	FFN<NegativeLogLikelihood<>, GaussianInitialization>* model;
@@ -242,8 +243,8 @@ protected:
 	double beta1; // Adam optimizer parameter b1. If another optmizer is selected this variable remains undefined.
 	double beta2; // Adam optimizer parameter b2. If another optmizer is selected this variable remains undefined.
 	double eps; // Value used to initialise the mean squared gradient parameter for the selected optimizer.
-	size_t maxIterations; /** The maximum number of points that are processed by the selected optimizer
-						  (i.e., one iteration equals one point; one iteration does not equal one pass over the dataset). */
+	size_t maxIterations; // The maximum number of points that are processed by the selected optimizer
+						  // (i.e., one iteration equals one point; one iteration does not equal one pass over the dataset).
 	double tolerance; // The tolerance parameter of the selected optimizer.
 	size_t batch_size; // The batch size.
 	
@@ -273,7 +274,7 @@ public:
 	inline vector<arma::SizeMat> modelDimensions() const override;
 	
 };
-
+*/
 } /** End namespace MLPACK_Classification */
 
 namespace MLPACK_Regression{
@@ -325,7 +326,7 @@ public:
 /*********************************************
 	Neural Network Regressor
 *********************************************/
-
+/*
 class NN_Regressor : public MLPACK_Learner {
 protected:
 	FFN< MeanSquaredError<>, GaussianInitialization>* model; // The actual feed forward neurar network topology.
@@ -334,8 +335,8 @@ protected:
 	double beta1; // Adam optimizer parameter b1. If another optmizer is selected this variable remains undefined.
 	double beta2; // Adam optimizer parameter b2. If another optmizer is selected this variable remains undefined.
 	double eps; // Value used to initialise the mean squared gradient parameter for the selected optimizer.
-	size_t maxIterations; /** The maximum number of points that are processed by the selected optimizer
-						  (i.e., one iteration equals one point; one iteration does not equal one pass over the dataset). */
+	size_t maxIterations; // The maximum number of points that are processed by the selected optimizer
+						  // (i.e., one iteration equals one point; one iteration does not equal one pass over the dataset).
 	double tolerance; // The tolerance parameter of the selected optimizer.
 	size_t batch_size; // The batch size.
 	
@@ -365,7 +366,7 @@ public:
 	inline vector<arma::SizeMat> modelDimensions() const override;
 	inline size_t byte_size() const override { return sizeof(float)*(model->Parameters().n_elem); }
 	
-};
+};*/
 
 } /** End namespace MLPACK_Regression */
 

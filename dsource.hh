@@ -90,6 +90,7 @@ struct hdf5CompoundSource : public data_source<T>{
 	typename buffered_dataset<T>::iterator currec;
 
 	hdf5CompoundSource(H5std_string fname, H5std_string dname, hsize_t num_of_feats, hsize_t num_of_pts);
+	~hdf5CompoundSource();
 
 	// Rewinds the whole dataset.
 	void rewind() override;
@@ -126,12 +127,9 @@ hdf5CompoundSource<T>::hdf5CompoundSource(H5std_string fname, H5std_string dname
 	hid_t array_tid = H5Tarray_create(H5T_NATIVE_LDOUBLE, 1, array_dim);
 	
 	record_type = CompType(sizeof(T));
-	record_type.insertMember("ID", 
-		HOFFSET(T, id), PredType::NATIVE_INT );
-	record_type.insertMember("FEATURES", 
-		HOFFSET(T, features), array_tid );
-	record_type.insertMember("LABEL", 
-		HOFFSET(T, label), PredType::NATIVE_LDOUBLE );
+	record_type.insertMember("ID", HOFFSET(T, id), PredType::NATIVE_INT );
+	record_type.insertMember("FEATURES", HOFFSET(T, features), array_tid );
+	record_type.insertMember("LABEL", HOFFSET(T, label), PredType::NATIVE_LDOUBLE );
 
 	// Open the file and dataset.
 	H5File* file = new H5File( fname, H5F_ACC_RDONLY );
@@ -143,6 +141,13 @@ hdf5CompoundSource<T>::hdf5CompoundSource(H5std_string fname, H5std_string dname
 	// start iteration
 	rewind();
 
+}
+
+template<class T>
+hdf5CompoundSource<T>::~hdf5CompoundSource(){
+	file = nullptr;
+	dataset = nullptr;
+	buffer.clean();
 }
 
 template <class T>
@@ -238,6 +243,7 @@ struct hdf5Source : public data_source<T>, public boost::enable_shared_from_this
 	bool load_ids; // If false, the ids are not loaded from the disk.
 
 	hdf5Source(H5std_string fname, H5std_string dname, bool ld_ids);
+	~hdf5Source();
 
 	// Rewinds the whole dataset.
 	void rewind() override;
@@ -301,6 +307,13 @@ hdf5Source<T>::hdf5Source(H5std_string fname, H5std_string dname, bool ld_ids)
 	// start iteration
 	rewind();
 
+}
+
+template<typename T>
+hdf5Source<T>::~hdf5Source(){
+	file = nullptr;
+	dataset = nullptr;
+	buffer.clear();
 }
 
 template<typename T>

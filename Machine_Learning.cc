@@ -74,7 +74,7 @@ void PassiveAgressiveClassifier::fit(const arma::mat& batch, const arma::mat& la
 		}
 			
 		// Calculate the Lagrange Multiplier.
-		double Lagrange_Muliplier;
+		double Lagrange_Muliplier = 0.;
 		if(regularization=="none"){
 			Lagrange_Muliplier = loss / ( arma::dot(batch.unsafe_col(i),batch.unsafe_col(i))+1 ) ;
 		}else if (regularization=="l1"){
@@ -262,7 +262,7 @@ inline vector<arma::SizeMat> ELM_Classifier::modelDimensions() const{
 /*********************************************
 	Multi Layer Perceptron Classifier
 *********************************************/
-
+/*
 MLP_Classifier::MLP_Classifier(string cfg, string net_name)
 :MLPACK_Learner(){
 	try{
@@ -452,7 +452,7 @@ inline vector<arma::SizeMat> MLP_Classifier::modelDimensions() const{
 		md_size.push_back(arma::size(*param));
 	return md_size; 
 }
-
+*/
 
 /*********************************************
 	Passive Aggressive Regressor
@@ -519,7 +519,7 @@ void PassiveAgressiveRegression::fit(const arma::mat& batch, const arma::mat& la
 		double loss = std::max( 0.0 , std::abs( labels(0,i) - pred) - epsilon );
 			
 		// Calculate the Lagrange Multiplier.
-		double Lagrange_Muliplier;
+		double Lagrange_Muliplier = 0.;
 		if(regularization=="none"){
 			Lagrange_Muliplier = loss / arma::dot(batch.unsafe_col(i),batch.unsafe_col(i)) ;
 		}else if (regularization=="l1"){

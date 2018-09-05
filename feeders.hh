@@ -1109,9 +1109,11 @@ void HDF5_Drift_Feeder<distrNetType>::TrainNetworks(){
 			}
 		}
 
-		//myfile1 << "NetName,DistAlgo,LearnAlgo,Params,LocalSites, \
-		              Rounds,Subrounds,Rebalances,Safezones,TotalMessages, \
-					  TotalInfoMessages,TotalBytes,accuracy,threshold\n"
+		#if 0
+			"NetName,DistAlgo,LearnAlgo,Params,LocalSites, \
+			 Rounds,Subrounds,Rebalances,Safezones,TotalMessages, \
+			 TotalInfoMessages,TotalBytes,accuracy,threshold\n"
+		#endif
 		myfile1 << this->_net_container.at(net)->name()
 			   << "," << this->_net_container.at(net)->hub->cfg().distributed_learning_algorithm
 			   << "," << this->_net_container.at(net)->hub->cfg().learning_algorithm

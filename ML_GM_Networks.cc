@@ -273,8 +273,8 @@ void coordinator::initializeLearner(){
 		global_learner = new PassiveAgressiveClassifier(cfg().cfgfile, cfg().network_name);
 	}else if (cfg().learning_algorithm == "ELM"){
 		global_learner = new ELM_Classifier(cfg().cfgfile, cfg().network_name);
-	}else if (cfg().learning_algorithm == "MLP"){
-		global_learner = new MLP_Classifier(cfg().cfgfile, cfg().network_name);
+//	}else if (cfg().learning_algorithm == "MLP"){
+//		global_learner = new MLP_Classifier(cfg().cfgfile, cfg().network_name);
 	}else if(cfg().learning_algorithm == "PA_Reg"){
 		global_learner = new PassiveAgressiveRegression(cfg().cfgfile, cfg().network_name);
 //	}else if(cfg().learning_algorithm == "NN_Reg"){
@@ -388,8 +388,8 @@ void learning_node::initializeLearner(){
 		_learner = new PassiveAgressiveClassifier(cfg().cfgfile, cfg().network_name);
 	}else if (cfg().learning_algorithm == "ELM"){
 		_learner = new ELM_Classifier(cfg().cfgfile, cfg().network_name);
-	}else if(cfg().learning_algorithm == "MLP"){
-		_learner = new MLP_Classifier(cfg().cfgfile, cfg().network_name);
+//	}else if(cfg().learning_algorithm == "MLP"){
+//		_learner = new MLP_Classifier(cfg().cfgfile, cfg().network_name);
 	}else if(cfg().learning_algorithm == "PA_Reg"){
 		_learner = new PassiveAgressiveRegression(cfg().cfgfile, cfg().network_name);
 //	}else if(cfg().learning_algorithm == "NN_Reg"){

@@ -62,9 +62,9 @@ struct coordinator : process
 	
 	float phi;                       // The phi value of the functional geometric protocol.
 	float quantum;                   // The quantum of the functional geometric protocol.
-	int counter;                     // A counter used by the functional geometric protocol.
-	float barrier;                  // The smallest number the zeta function can reach.
-	int cnt;                         // Helping counter.
+	size_t counter;                  // A counter used by the functional geometric protocol.
+	float barrier;                   // The smallest number the zeta function can reach.
+	size_t cnt;                      // Helping counter.
 	
 	vector<arma::mat> Params;        // A placeholder for the parameters send by the nodes.
 	vector<arma::mat> Beta;          // The beta vector used by the protocol for the rebalancing process.    
@@ -153,10 +153,10 @@ struct learning_node : local_site {
 	vector<arma::mat> Delta_Vector;
 	vector<arma::mat> E_Delta;
 
-	int num_sites;			             // Number of sites.
+	size_t num_sites;			         // Number of sites.
 	coord_proxy_t coord;                 // The proxy of the coordinator/hub.
 
-	int counter;                         // The counter used by the FGM protocol.
+	size_t counter;                      // The counter used by the FGM protocol.
 	float quantum;                       // The quantum provided by the hub.
 	float zeta;                          // The value of the safezone function.
 
