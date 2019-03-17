@@ -76,9 +76,12 @@ struct coordinator : process
 	size_t counter;                     // A counter used by the functional geometric protocol.
 	double barrier;                     // The smallest number the zeta function can reach.
 	size_t cnt;                         // Helping counter.
+	bool rebalanced;                    // Flag to check if the current round has be rebalanced.
+	size_t round_rebs;                  // The number of rebalances ocuured in this round.
 	
 	vector<resizable_tensor*> Params;   // A placeholder for the parameters send by the nodes.
 	vector<resizable_tensor*> Beta;     // The beta vector used by the protocol for the rebalancing process.
+	vector<resizable_tensor*> temp;     // The helping placeholder.
 
 	coordinator(network_t* nw, dl_continuous_query<feature_t, label_t>* _Q); 
 	~coordinator();
@@ -136,9 +139,11 @@ void coordinator<feat,lb>::start_round(){
 	// Resets.
 	cnt = 0;
 	counter = 0;
+	rebalanced = false;
+	round_rebs = 0;
 	for(auto layer : Beta){
-		dlib::cpu::affine_transform(*layer, *layer, 0., 0.);
-		//dlib::cuda::affine_transform(*layer, *layer, 0.);
+		//dlib::cpu::affine_transform(*layer, *layer, 0., 0.);
+		dlib::cuda::affine_transform(*layer, *layer, 0.);
 	}
 	
 	// Calculating the new phi, quantum and the minimum acceptable value for phi.
@@ -161,6 +166,16 @@ oneway coordinator<feat,lb>::send_increment(increment inc){
 	counter += inc.increase;
 	if(counter>k){
 		phi = 0.;
+		if(rebalanced){
+			for(size_t i=0;i<Beta.size();i++){
+				//dlib::cpu::affine_transform(*temp.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., 2./cnt, 0.);
+				////dlib::cpu::affine_transform(*temp.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., std::pow(Q->config.beta_mu*cnt,-1), 0.);
+				////dlib::cuda::affine_transform(*temp.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., 2./cnt);
+				dlib::cuda::affine_transform(*temp.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., std::pow(Q->config.beta_mu*cnt,-1));
+			}
+			////phi += (cnt/2)*safe_zone->Zeta(temp);
+			phi += Q->config.beta_mu*cnt*safe_zone->Zeta(temp);
+		}
 		// Collect all data
 		for(auto n : node_ptr) {
 			phi += proxy[n].get_zed_value().value;
@@ -177,7 +192,12 @@ oneway coordinator<feat,lb>::send_increment(increment inc){
 			for(auto n : node_ptr) {
 				fetch_updates(n);
 			}
-			Rebalance();
+			if(Q->config.rebalancing){
+				rebalanced = true;
+				Rebalance();
+			}else{
+				finish_round();
+			}
 		}
 	}
 }
@@ -190,9 +210,16 @@ void coordinator<feat,lb>::fetch_updates(node_t* node){
 			node_bool_drift[node] = 1;
 			cnt++;
 		}
-		for(size_t i=0; i<up._model.size(); i++){
-			dlib::cpu::add(*Params.at(i), *Params.at(i), *up._model.at(i));
-			//dlib::cuda::add(1., *Params.at(i), 1., *up._model.at(i));
+		if(Q->config.rebalancing){
+			for(size_t i=0; i<up._model.size(); i++){
+				//dlib::cpu::add(*Params.at(i), *Params.at(i), *up._model.at(i));
+				dlib::cuda::add(1., *Params.at(i), 1., *up._model.at(i));
+			}
+		}else{
+			for(size_t i=0; i<up._model.size(); i++){
+				//dlib::cpu::add(*Beta.at(i), *Beta.at(i), *up._model.at(i));
+				dlib::cuda::add(1., *Beta.at(i), 1., *up._model.at(i));
+			}
 		}
 	}
 	total_updates += up.updates;
@@ -203,27 +230,31 @@ template<typename feat,typename lb>
 void coordinator<feat,lb>::Rebalance() {
 	
 	for(size_t i=0;i<Beta.size();i++){
-		dlib::cpu::add(*Beta.at(i), *Beta.at(i), *Params.at(i));
-		//dlib::cuda::affine_transform(*Beta.at(i), *Beta.at(i), *Params.at(i), 1., 1.);
+		//dlib::cpu::add(*Beta.at(i), *Beta.at(i), *Params.at(i));
+		dlib::cuda::affine_transform(*Beta.at(i), *Beta.at(i), *Params.at(i), 1., 1.);
 	}
 	for(size_t i=0;i<Beta.size();i++){
-		dlib::cpu::affine_transform(*Params.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., 2./cnt, 0.);
-		//dlib::cuda::affine_transform(*Params.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., 2./cnt);
+		//dlib::cpu::affine_transform(*Params.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., 2./cnt, 0.);
+		////dlib::cpu::affine_transform(*Params.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., std::pow(Q->config.beta_mu*cnt,-1), 0.);
+		////dlib::cuda::affine_transform(*Params.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., 2./cnt);
+		dlib::cuda::affine_transform(*Params.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., std::pow(Q->config.beta_mu*cnt,-1));
 	}
 	//phi = (k/2)*safe_zone->Zeta(Params) + (k/2)*safe_zone->Zeta(query->GlobalModel);
-	phi = (cnt/2)*safe_zone->Zeta(Params) + ( (cnt/2)+(k-cnt) )*safe_zone->Zeta(query->GlobalModel);
+	////phi = (cnt/2)*safe_zone->Zeta(Params) + ( (cnt/2)+(k-cnt) )*safe_zone->Zeta(query->GlobalModel);
+	phi = Q->config.beta_mu*cnt*safe_zone->Zeta(Params) + ( (1.-Q->config.beta_mu)*cnt+(k-cnt) )*safe_zone->Zeta(query->GlobalModel);
 	for(size_t i=0;i<Params.size();i++){
-		dlib::cpu::affine_transform(*Params.at(i), *Params.at(i), 0., 0.);
-		//dlib::cuda::affine_transform(*Params.at(i), *Params.at(i), 0.);
+		//dlib::cpu::affine_transform(*Params.at(i), *Params.at(i), 0., 0.);
+		dlib::cuda::affine_transform(*Params.at(i), *Params.at(i), 0.);
 	}
 	
-	if (phi>=cfg().reb_mult*barrier){
+	if ( phi>=cfg().reb_mult*barrier && round_rebs<=Q->config.max_rebs ){
 		counter = 0;
 		quantum = (float)(phi/(2*k));
 		// send the new quantum
 		for(auto n : node_ptr) {
 			proxy[n].rebalance(float_value(quantum));
 		}
+		round_rebs++;
 		num_subrounds++;
 		num_rebalances++;
 	}else{
@@ -236,8 +267,8 @@ template<typename feat,typename lb>
 void coordinator<feat,lb>::finish_round() {
 	// New round
 	for(size_t i=0;i<Beta.size();i++){
-		dlib::cpu::affine_transform(*Beta.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., std::pow(cnt,-1), 0.);
-		//dlib::cuda::affine_transform(*Beta.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., std::pow(cnt,-1));
+		//dlib::cpu::affine_transform(*Beta.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., std::pow(cnt,-1), 0.);
+		dlib::cuda::affine_transform(*Beta.at(i), *query->GlobalModel.at(i), *Beta.at(i), 1., std::pow(cnt,-1));
 	}
 	query->update_estimate(Beta);
 	global_learner->update_model(Beta);
@@ -316,14 +347,19 @@ void coordinator<feat,lb>::warmup(std::vector<matrix<feat>>& batch, std::vector<
 		for(auto layer:global_learner->Parameters()){
 			resizable_tensor* l;
 			resizable_tensor* _l;
+			resizable_tensor* __l;
 			l = new resizable_tensor();
 			_l = new resizable_tensor();
+			__l = new resizable_tensor();
 			l->set_size(layer->num_samples(),layer->k(),layer->nr(),layer->nc());
 			_l->set_size(layer->num_samples(),layer->k(),layer->nr(),layer->nc());
+			__l->set_size(layer->num_samples(),layer->k(),layer->nr(),layer->nc());
 			*l = 0.;
 			*_l = 0.;
+			*__l = 0.;
 			Beta.push_back(l);
 			Params.push_back(_l);
+			temp.push_back(__l);
 		}
 	}
 }
@@ -331,8 +367,8 @@ void coordinator<feat,lb>::warmup(std::vector<matrix<feat>>& batch, std::vector<
 template<typename feat,typename lb>
 void coordinator<feat,lb>::end_warmup(){
 	for(size_t i=0;i<Beta.size();i++){
-		dlib::cpu::affine_transform(*Beta.at(i), *global_learner->Parameters().at(i), 1., 0.);
-		//dlib::cuda::affine_transform(*Beta.at(i), *global_learner->Parameters().at(i), 1.);
+		//dlib::cpu::affine_transform(*Beta.at(i), *global_learner->Parameters().at(i), 1., 0.);
+		dlib::cuda::affine_transform(*Beta.at(i), *global_learner->Parameters().at(i), 1.);
 	}
 	query->update_estimate(Beta);
 	start_round();
@@ -413,19 +449,21 @@ struct learning_node : local_site {
 	typedef coord_proxy<feature_t, label_t> coord_proxy_t;
     typedef dl_continuous_query<feature_t, label_t> continuous_query_t;
 
-    continuous_query_t* Q;               // The query management object.
-    dl_safezone szone;                   // The safezone object.
-	DLIB_Learner<feat,lb>* _learner;
-	vector<resizable_tensor*> Delta_Vector;
-	vector<resizable_tensor*> E_Delta;
+    continuous_query_t* Q;                   // The query management object.
+    dl_safezone szone;                       // The safezone object.
+	DLIB_Learner<feat,lb>* _learner;         // The learner.
+	vector<resizable_tensor*> Drift_Vector;  // The drift to be send to the coordinator.
+	vector<resizable_tensor*> E_Delta;       // The parameter updates
 
-	size_t num_sites;			         // Number of sites.
-	size_t datapoints_seen;              // Number of points the node has seen since the last synchronization.
-	coord_proxy_t coord;                 // The proxy of the coordinator/hub.
+	size_t num_sites;			             // Number of sites.
+	size_t datapoints_seen;                  // Number of points the node has seen since the last synchronization.
+	coord_proxy_t coord;                     // The proxy of the coordinator/hub.
 	
-	size_t counter;                      // The counter used by the FGM protocol.
-	float quantum;                       // The quantum provided by the hub.
-	float zeta;                          // The value of the safezone function.
+	size_t counter;                          // The counter used by the FGM protocol.
+	float quantum;                           // The quantum provided by the hub.
+	float zeta;                              // The value of the safezone function.
+	
+	bool rebalanced;                         // Flag to check if the current round has be rebalanced.
 
 	learning_node(network_t* net, source_id hid, continuous_query_t* _Q)
 	:	local_site(net, hid), Q(_Q), coord( this )
@@ -465,18 +503,19 @@ struct learning_node : local_site {
 
 template<typename feat,typename lb>
 oneway learning_node<feat,lb>::reset(const dl_safezone& newsz, const float_value qntm){
-	datapoints_seen = 0;
+	rebalanced = false;                                               // Reset the rebalanced flag
+	datapoints_seen = 0;											  // Reset the number of points seen
 	counter = 0;                                                      // Reset the counter
 	szone = newsz;                                                    // Reset the safezone object
 	quantum = 1.*qntm.value;                                          // Reset the quantum
 	_learner->update_model(szone.getSZone()->getGlobalModel());       // Updates the parameters of the local learner
 	zeta = szone(_learner->Parameters(), true);                       // Reset zeta
 	
-	// TODO: Make a pretty function for it.
 	for (size_t i=0; i<_learner->Parameters().size(); i++){
-		dlib::cpu::affine_transform(*E_Delta.at(i), *_learner->Parameters().at(i), 1., 0.);
-		//dlib::cuda::affine_transform(*E_Delta.at(i), *_learner->Parameters().at(i), 1.);
+		//dlib::cpu::affine_transform(*E_Delta.at(i), *_learner->Parameters().at(i), 1., 0.);
+		dlib::cuda::affine_transform(*E_Delta.at(i), *_learner->Parameters().at(i), 1.);
 	}
+	
 }
 
 
@@ -489,30 +528,38 @@ oneway learning_node<feat,lb>::take_quantum(const float_value qntm){
 
 template<typename feat,typename lb>
 oneway learning_node<feat,lb>::rebalance(const float_value qntm){
+	rebalanced = true;
 	counter = 0;
-	quantum = 1.*qntm.value;                                  // Update the quantum
+	quantum = 1.*qntm.value;                                   // Update the quantum
 	
 	for (size_t i=0; i<_learner->Parameters().size(); i++){
-		dlib::cpu::affine_transform(*E_Delta.at(i), *_learner->Parameters().at(i), 1., 0.);
-		//dlib::cuda::affine_transform(*E_Delta.at(i), *_learner->Parameters().at(i), 1.);
+		//dlib::cpu::affine_transform(*E_Delta.at(i), *_learner->Parameters().at(i), 1., 0.);
+		dlib::cuda::affine_transform(*E_Delta.at(i), *_learner->Parameters().at(i), 1.);
 	}
-	
-	zeta = szone(_learner->Parameters(), E_Delta);            // Reset zeta
+
+	zeta = szone(_learner->Parameters(), E_Delta);        // Reset zeta
 }
 
 template<typename feat,typename lb>
 dl_model_state<resizable_tensor> learning_node<feat,lb>::get_drift(){
-	// Getting the drift vector is done as getting the local statistic
+	
+	// Getting the drift vector is done as getting the local statistic.
 	for (size_t i=0; i<_learner->Parameters().size(); i++){
-		dlib::cpu::affine_transform(*Delta_Vector.at(i), *_learner->Parameters().at(i), *E_Delta.at(i), 1., -1., 0.);
-		//dlib::cuda::affine_transform(*Delta_Vector.at(i), *_learner->Parameters().at(i), *E_Delta.at(i), 1., -1.);
+		//dlib::cpu::affine_transform(*Drift_Vector.at(i), *_learner->Parameters().at(i), *E_Delta.at(i), 1., -1., 0.);
+		dlib::cuda::affine_transform(*Drift_Vector.at(i), *_learner->Parameters().at(i), *E_Delta.at(i), 1., -1.);
 	}
-	return dl_model_state<resizable_tensor>(Delta_Vector, _learner->getNumOfUpdates());
+	
+	return dl_model_state<resizable_tensor>(Drift_Vector, _learner->getNumOfUpdates());
 }
 
 template<typename feat,typename lb>
 float_value learning_node<feat,lb>::get_zed_value(){
-	return float_value((float)szone(_learner->Parameters(), E_Delta));
+	if( rebalanced && (std::abs(szone(_learner->Parameters(), true)-std::sqrt(szone.getSZone()->hyperparameters.at(0))) > 1e-6) ){
+		//return float_value(szone.getSZone()->checkIfAdmissible_reb(_learner->Parameters(), E_Delta));
+		return float_value(szone.getSZone()->checkIfAdmissible_reb(_learner->Parameters(), E_Delta, 1.-cfg().beta_mu));
+	}else{
+		return float_value((float)szone(_learner->Parameters(), E_Delta));
+	}
 }
 
 template<typename feat,typename lb>
@@ -559,7 +606,7 @@ void learning_node<feat,lb>::initializeLearner(){
 			_l->set_size(layer->num_samples(),layer->k(),layer->nr(),layer->nc());
 			*l = 0.;
 			*_l = 0.;
-			Delta_Vector.push_back(l);
+			Drift_Vector.push_back(l);
 			E_Delta.push_back(_l);
 		}
 	}

@@ -5,43 +5,49 @@
 		"net_name_1" : "net1",
 		"net_name_2" : "net2",
 		"net_name_3" : "net3",
+		"net_name_4" : "net4",
+		"net_name_5" : "net5",
+		"net_name_6" : "net6",
+		"net_name_7" : "net7",
+		"net_name_8" : "net8",
+		"net_name_9" : "net9",
 		"number_of_networks" : 1,
 		"learning_problem" : "classification",
 		"data" : "tests_hdf5_Data",
 		"stream_distribution" : "Stream_Distribution1",
 		"log_diff_acc" : false,
-		"seed" : -1 // Give any non negative value for random reproducibility
-					// and any negative value for "completely random results".
+		"seed" : -1                     // Give any non negative value for random reproducibility
+			                        // and any negative value for "completely random results".
 	},
 
 	"tests_hdf5_Data":{
 		"encoding" : "UTF-8",
-		"batch_size" : 64,
-		"warmup_size" : 1000, // Max size : 1000 data points.
-		"test_size" : 10000,
+		"batch_size" : 64,              // Options : positive integers
+		"warmup_size" : 1000,           // Max size : 1000 data points
+		"test_size" : 10000,            // Options : 10000 , 20000
 		"epochs" : 1
 	},
 
 	"Stream_Distribution1":{
 		"encoding" : "UTF-8",
-		"uniform" : false,
+		"uniform" : true,
 		"B_prob" : 0.75,
 		"site_ratio" : 0.5
 	},
 
-	"gm_network_net1":{ // format : gm_network_<network_name>
+	"gm_network_net1":{                 // format : gm_network_<network_name>
 		"encoding" : "UTF-8",
-		"number_of_local_nodes" : 4,
+		"number_of_local_nodes" : 32,
 		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
 		"image_width" : 28,
 		"image_height" : 28,
 		"number_of_channels" : 1,
-		"distributed_learning_algorithm" : "dist_algo_net4"
+		"distributed_learning_algorithm" : "dist_algo_net1"
 	},
 	
-	"gm_network_net2":{ // format : gm_network_<network name>
+	"gm_network_net2":{                 // format : gm_network_<network name>
 		"encoding" : "UTF-8",
-		"number_of_local_nodes" : 16,
+		"number_of_local_nodes" : 8,
 		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
 		"image_width" : 28,
 		"image_height" : 28,
@@ -49,7 +55,7 @@
 		"distributed_learning_algorithm" : "dist_algo_net2"
 	},
 
-	"gm_network_net3":{ // format : gm_network_<network name>
+	"gm_network_net3":{                 // format : gm_network_<network name>
 		"encoding" : "UTF-8",
 		"number_of_local_nodes" : 16,
 		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
@@ -59,73 +65,169 @@
 		"distributed_learning_algorithm" : "dist_algo_net3"
 	},
 
+	"gm_network_net4":{                 // format : gm_network_<network_name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 32,
+		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
+		"image_width" : 28,
+		"image_height" : 28,
+		"number_of_channels" : 1,
+		"distributed_learning_algorithm" : "dist_algo_net4"
+	},
+	
+	"gm_network_net5":{                 // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 64,
+		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
+		"image_width" : 28,
+		"image_height" : 28,
+		"number_of_channels" : 1,
+		"distributed_learning_algorithm" : "dist_algo_net5"
+	},
+
+	"gm_network_net6":{                 // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 128,
+		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
+		"image_width" : 28,
+		"image_height" : 28,
+		"number_of_channels" : 1,
+		"distributed_learning_algorithm" : "dist_algo_net6"
+	},
+
+	"gm_network_net7":{                 // format : gm_network_<network_name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 256,
+		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
+		"image_width" : 28,
+		"image_height" : 28,
+		"number_of_channels" : 1,
+		"distributed_learning_algorithm" : "dist_algo_net7"
+	},
+	
+	"gm_network_net8":{                 // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 512,
+		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
+		"image_width" : 28,
+		"image_height" : 28,
+		"number_of_channels" : 1,
+		"distributed_learning_algorithm" : "dist_algo_net8"
+	},
+
+	"gm_network_net9":{                 // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 1024,
+		"learning_algorithm" : "LeNet", // Learning algorithm options : [LeNet]
+		"image_width" : 28,
+		"image_height" : 28,
+		"number_of_channels" : 1,
+		"distributed_learning_algorithm" : "dist_algo_net9"
+	},
+
 	"dist_algo_net1":{
-		"algorithm" : "VarFuncMon", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
+		"threshold" : 0.008,
+		"batch_size" : 64,
 		"precision" : 0.01,
-		"threshold" : 0.0008,
-		"batch_size" : 64
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 10.0,     // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
 	},
 	
 	"dist_algo_net2":{
-		"algorithm" : "VarFuncMon", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
 		"precision" : 0.01,
 		"threshold" : 0.0008,
-		"batch_size" : 128
+		"batch_size" : 128,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
 	},
 
 	"dist_algo_net3":{
-		"algorithm" : "VarFuncMon", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
 		"precision" : 0.01,
 		"threshold" : 0.0008,
-		"batch_size" : 192
+		"batch_size" : 192,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
 	},
 	
 	"dist_algo_net4":{
-		"algorithm" : "Michael_Kamp", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
 		"precision" : 0.01,
-		"reb_mult" : 1.0, // Give a positive value only for rebalancing
 		"threshold" : 0.008,
-		"batch_size" : 128
+		"batch_size" : 128,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
 	},
 
 	"dist_algo_net5":{
-		"algorithm" : "VarFuncMon", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
 		"precision" : 0.01,
 		"threshold" : 0.008,
-		"batch_size" : 128
+		"batch_size" : 128,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
 	},
 
 	"dist_algo_net6":{
-		"algorithm" : "VarFuncMon", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
 		"precision" : 0.01,
 		"threshold" : 0.008,
-		"batch_size" : 192
+		"batch_size" : 192,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
 	},
 
 	"dist_algo_net7":{
-		"algorithm" : "VarFuncMon", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
 		"precision" : 0.01,
 		"threshold" : 0.08,
-		"batch_size" : 64
+		"batch_size" : 64,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+		
 	},
 
 	"dist_algo_net8":{
-		"algorithm" : "VarFuncMon", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
 		"precision" : 0.01,
 		"threshold" : 0.08,
-		"batch_size" : 128
+		"batch_size" : 128,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
 	},
 
 	"dist_algo_net9":{
-		"algorithm" : "VarFuncMon", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
 		"precision" : 0.01,
 		"threshold" : 0.08,
-		"batch_size" : 192
+		"batch_size" : 192,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
 	},
 
 	"data" : {
 		"encoding" : "UTF-8",
-		"file_name" : "TestFile2.h5", // The name of the hdf5 file.
+		"file_name" : "TestFile2.h5",   // The name of the hdf5 file.
 		"train_dset_name" : "AMNIST_train",
 		"test_dset_name" : "MNIST_Test"
 	}

@@ -174,6 +174,18 @@ float Variance_safezone_func::checkIfAdmissible(const vector<arma::mat*>& par1, 
 	return std::sqrt(threshold)-std::sqrt(res);
 }
 
+float Variance_safezone_func::checkIfAdmissible_reb(const vector<arma::mat*>& par1, const vector<arma::mat>& par2, float coef) const {
+	float res=0.;
+	for(size_t i=0;i<par1.size();i++){
+		arma::mat subtr = *par1.at(i)-par2.at(i);
+		////subtr *= 2.;
+		subtr *= coef;
+		res += arma::dot(subtr,subtr);
+	}
+	////return 0.5*(std::sqrt(threshold)-std::sqrt(res));
+	return coef*(std::sqrt(threshold)-std::sqrt(res));
+}
+
 float Variance_safezone_func::checkIfAdmissible_v2(const vector<arma::mat>& drift) const {
 	float var = 0.;
 	for(size_t i=0; i<drift.size(); i++){
@@ -284,11 +296,12 @@ ml_safezone_function* query_state::safezone(string cfg, string algo){
 	std::ifstream cfgfl(cfg);
 	cfgfl >> root;
 	
-	string algorithm = root[algo].get("algorithm","Batch_Learning").asString();
+	string algorithm = root[algo].get("algorithm","Variance_Monitoring").asString();
+	cout << algorithm << endl;
 	if(algorithm == "Batch_Learning"){
 		auto safe_zone = new Batch_Learning(GlobalModel, root[algo].get("batch_size",32).asInt64());
 		return safe_zone;
-	}else if(algorithm == "Michael_Kamp"){
+	}else if(algorithm == "Variance_Monitoring"){
 		auto safe_zone = new Variance_safezone_func(GlobalModel,
 		                                            root[algo].get("threshold",1.).asDouble(),
 													root[algo].get("batch_size",32).asInt64());
@@ -317,7 +330,11 @@ continuous_query::continuous_query(arma::mat* tSet, arma::mat* tRes, string cfg,
 									        .get("distributed_learning_algorithm", "Trash").asString();
 	config.network_name = nm;
 	config.precision = root[config.distributed_learning_algorithm].get("precision", 0.01).asFloat();
+	config.rebalancing = root[config.distributed_learning_algorithm].get("rebalancing", false).asBool();
 	config.reb_mult = root[config.distributed_learning_algorithm].get("reb_mult", -1.).asFloat();
+	config.beta_mu = root[config.distributed_learning_algorithm].get("beta_mu", 0.5).asFloat();
+	config.max_rebs = root[config.distributed_learning_algorithm].get("max_rebs", 2).asInt64();
+	
 	config.cfgfile = cfg;
 	
 	cout << "Query initialized : " << config.learning_algorithm << ", ";
@@ -460,8 +477,8 @@ float Param_Variance_safezone_func::Zeta(const vector<tensor*>& mdl) const
 	for(size_t i=0;i<mdl.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(mdl.at(i)->num_samples(), mdl.at(i)->k(), mdl.at(i)->nr(), mdl.at(i)->nc());
-		dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
-		//dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
+		//dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
+		dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
 		res+=dot(subtr,subtr);
 	}
 	return std::sqrt(threshold)-std::sqrt(res);
@@ -473,8 +490,8 @@ float Param_Variance_safezone_func::Zeta(const vector<resizable_tensor*>& mdl) c
 	for(size_t i=0;i<mdl.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(mdl.at(i)->num_samples(), mdl.at(i)->k(), mdl.at(i)->nr(), mdl.at(i)->nc());
-		dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
-		//dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
+		//dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
+		dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
 		res+=dot(subtr,subtr);
 	}
 	return std::sqrt(threshold)-std::sqrt(res);
@@ -491,8 +508,8 @@ float Param_Variance_safezone_func::checkIfAdmissible(const vector<tensor*>& mdl
 	for(size_t i=0;i<mdl.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(mdl.at(i)->num_samples(), mdl.at(i)->k(), mdl.at(i)->nr(), mdl.at(i)->nc());
-		dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
-		//dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
+		//dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
+		dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
 		res+=dot(subtr,subtr);
 	}
 	return threshold-res;
@@ -504,8 +521,8 @@ float Param_Variance_safezone_func::checkIfAdmissible(const vector<resizable_ten
 	for(size_t i=0;i<mdl.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(mdl.at(i)->num_samples(), mdl.at(i)->k(), mdl.at(i)->nr(), mdl.at(i)->nc());
-		dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
-		//dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
+		//dlib::cpu::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1., 0.);
+		dlib::cuda::affine_transform(subtr, *mdl.at(i), *GlobalModel.at(i), -1., 1.);
 		res+=dot(subtr,subtr);
 	}
 	return threshold-res;
@@ -517,12 +534,41 @@ float Param_Variance_safezone_func::checkIfAdmissible(const vector<tensor*>& par
 	for(size_t i=0;i<par1.size();i++){
 		resizable_tensor subtr;
 		subtr.set_size(par2.at(i)->num_samples(), par2.at(i)->k(), par2.at(i)->nr(), par2.at(i)->nc());
-		dlib::cpu::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1., 0.);
-		//dlib::cuda::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1.);
+		//dlib::cpu::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1., 0.);
+		dlib::cuda::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1.);
 		res+=dot(subtr,subtr);
 	}
 	return std::sqrt(threshold)-std::sqrt(res);
 }
+
+float Param_Variance_safezone_func::checkIfAdmissible_reb(const vector<tensor*>& par1, const vector<resizable_tensor*>& par2, float coef) const
+{
+	float res=0.;
+	for(size_t i=0;i<par1.size();i++){
+		resizable_tensor subtr;
+		subtr.set_size(par2.at(i)->num_samples(), par2.at(i)->k(), par2.at(i)->nr(), par2.at(i)->nc());
+		////dlib::cpu::affine_transform(subtr, *par1.at(i), *par2.at(i), 2., -2., 0.);
+		//dlib::cpu::affine_transform(subtr, *par1.at(i), *par2.at(i), std::pow(coef,-1), -std::pow(coef,-1), 0.);
+		////dlib::cuda::affine_transform(subtr, *par1.at(i), *par2.at(i), 2., -2.);
+		dlib::cuda::affine_transform(subtr, *par1.at(i), *par2.at(i), std::pow(coef,-1), -std::pow(coef,-1));
+		res+=dot(subtr,subtr);
+	}
+	////return 0.5*(std::sqrt(threshold)-std::sqrt(res));
+	return coef*(std::sqrt(threshold)-std::sqrt(res));
+}
+
+//float Param_Variance_safezone_func::checkIfAdmissible(const vector<tensor*>& par1, const vector<resizable_tensor*>& par2) const
+//{
+//	float res=0.;
+//	for(size_t i=0;i<par1.size();i++){
+//		resizable_tensor subtr;
+//		subtr.set_size(par2.at(i)->num_samples(), par2.at(i)->k(), par2.at(i)->nr(), par2.at(i)->nc());
+//		//dlib::cpu::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1., 0.);
+//		dlib::cuda::affine_transform(subtr, *par1.at(i), *par2.at(i), 1., -1.);
+//		res+=dot(subtr,subtr);
+//	}
+//	return std::sqrt(threshold)-std::sqrt(res);
+//}
 
 float Param_Variance_safezone_func::checkAdmissibleNorm(const vector<tensor*>& drifts) const 
 {
@@ -616,8 +662,8 @@ void dl_query_state::initializeGlobalModel(const vector<tensor*>& mdl){
 
 void dl_query_state::update_estimate(vector<resizable_tensor*>& mdl){
 	for(size_t i=0;i<GlobalModel.size();i++){
-		dlib::cpu::affine_transform(*GlobalModel.at(i), *mdl.at(i), 1., 0.);
-		//dlib::cuda::affine_transform(*GlobalModel.at(i), *mdl.at(i), 1.);
+		//dlib::cpu::affine_transform(*GlobalModel.at(i), *mdl.at(i), 1., 0.);
+		dlib::cuda::affine_transform(*GlobalModel.at(i), *mdl.at(i), 1.);
 	}
 }
 
@@ -629,11 +675,11 @@ dl_safezone_function* dl_query_state::dl_safezone(string cfg, string algo){
 	std::ifstream cfgfl(cfg);
 	cfgfl >> root;
 	
-	string algorithm = root[algo].get("algorithm","Batch_Learning").asString();
+	string algorithm = root[algo].get("algorithm","Variance_Monitoring").asString();
 	if(algorithm == "Batch_Learning"){
 		auto safe_zone = new Batch_safezone_function(GlobalModel, root[algo].get("batch_size",32).asInt64());
 		return safe_zone;
-	}else if(algorithm == "Michael_Kamp" || algorithm == "VarFuncMon" ){
+	}else if(algorithm == "Variance_Monitoring"){
 		auto safe_zone = new Param_Variance_safezone_func(GlobalModel,
 		                                                  root[algo].get("threshold",1.).asDouble(),
 													      root[algo].get("batch_size",32).asInt64());

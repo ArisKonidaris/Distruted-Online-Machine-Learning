@@ -13,6 +13,7 @@ void coordinator::start_round(){
 	// Resets.
 	cnt = 0;
 	counter = 0;
+	rebalanced = false;
 	for(size_t i=0; i<Beta.size(); i++){
 		Beta.at(i).zeros();
 	}
@@ -41,6 +42,15 @@ oneway coordinator::send_increment(increment inc){
 	counter += inc.increase;
 	if(counter>k){
 		phi = 0.;
+		if(rebalanced){
+			for(size_t i=0;i<Beta.size();i++){
+				////temp.at(i) = query->GlobalModel.at(i) + (2./cnt)*Beta.at(i);
+				temp.at(i) = query->GlobalModel.at(i) + std::pow(Q->config.beta_mu*cnt,-1)*Beta.at(i);
+			}
+			////phi += (cnt/2)*safe_zone->Zeta(temp);
+			phi += std::pow(Q->config.beta_mu*cnt,-1)*cnt*safe_zone->Zeta(temp);
+		}
+		
 		// Collect all data
 		for(auto n : node_ptr) {
 			phi += proxy[n].get_zed_value().value;
@@ -58,7 +68,12 @@ oneway coordinator::send_increment(increment inc){
 			for(auto n : node_ptr) {
 				fetch_updates(n);
 			}
-			Rebalance();
+			if(Q->config.rebalancing){
+				rebalanced = true;
+				Rebalance();
+			}else{
+				finish_round();
+			}
 		}
 	}
 }
@@ -70,8 +85,14 @@ void coordinator::fetch_updates(node_t* node){
 			node_bool_drift[node] = 1;
 			cnt++;
 		}
-		for(size_t i=0; i<up._model.size(); i++){
-			Params.at(i) += up._model.at(i);
+		if(Q->config.rebalancing){
+			for(size_t i=0; i<up._model.size(); i++){
+				Params.at(i) += up._model.at(i);
+			}
+		}else{
+			for(size_t i=0; i<up._model.size(); i++){
+				Beta.at(i) += up._model.at(i);
+			}
 		}
 	}
 	total_updates += up.updates;
@@ -84,17 +105,19 @@ void coordinator::Rebalance() {
 		Beta.at(i) += Params.at(i);
 	}
 	for(size_t i=0;i<Beta.size();i++){
-		Params.at(i) = query->GlobalModel.at(i) + (2./cnt)*Beta.at(i);
+		////Params.at(i) = query->GlobalModel.at(i) + (2./cnt)*Beta.at(i);
+		Params.at(i) = query->GlobalModel.at(i) + std::pow(Q->config.beta_mu*cnt,-1)*Beta.at(i);
 	}
 	
 	//phi = (k/2)*safe_zone->Zeta(Params) + (k/2)*safe_zone->Zeta(query->GlobalModel);
-	phi = (cnt/2)*safe_zone->Zeta(Params) + ( (cnt/2)+(k-cnt) )*safe_zone->Zeta(query->GlobalModel);
+	////phi = (cnt/2)*safe_zone->Zeta(Params) + ( (cnt/2)+(k-cnt) )*safe_zone->Zeta(query->GlobalModel);
+	phi = Q->config.beta_mu*cnt*safe_zone->Zeta(Params) + ( (1.-Q->config.beta_mu)*cnt+(k-cnt) )*safe_zone->Zeta(query->GlobalModel);
 	
 	for(size_t i=0;i<Params.size();i++){
 		Params.at(i).zeros();
 	}
 	
-	if (phi>=1.*barrier){
+	if (phi>=1.*barrier && round_rebs<=Q->config.max_rebs ){
 		counter = 0;
 		quantum = phi/(2*k);
 		assert(quantum>0);
@@ -248,6 +271,7 @@ void coordinator::warmup(arma::mat& batch, arma::mat& labels){
 		for(arma::SizeMat sz : model_sizes){
 			Beta.push_back(arma::mat(sz, arma::fill::zeros));
 			Params.push_back(arma::mat(sz, arma::fill::zeros));
+			temp.push_back(arma::mat(sz, arma::fill::zeros));
 		}
 	}
 }
@@ -311,6 +335,7 @@ oneway learning_node::reset(const safezone& newsz, const float_value qntm){
 	quantum = 1.*qntm.value;                                          // Reset the quantum
 	_learner->update_model(szone.getSZone()->getGlobalModel());       // Updates the parameters of the local learner
 	zeta = szone.getSZone()->Zeta(_learner->getModel());              // Reset zeta
+	rebalanced = false;
 	
 	// Initializng the helping matrices if they are not yet initialized.
 	if(E_Delta.empty()){
@@ -339,6 +364,7 @@ oneway learning_node::take_quantum(const float_value qntm){
 oneway learning_node::rebalance(const float_value qntm){
 	counter = 0;											// Reset counter
 	quantum = 1.*qntm.value;                                // Update the quantum
+	rebalanced = true;
 	
 	// Updating the E_Delta vector.
 	for (size_t i=0; i<_learner->getModel().size(); i++){
@@ -360,7 +386,11 @@ model_state learning_node::get_drift(){
 }
 
 float_value learning_node::get_zed_value(){
-	return float_value(szone(_learner->getModel(), E_Delta));
+	if(rebalanced && arma::approx_equal(arma::mat(arma::size(E_Delta.at(0)),arma::fill::zeros), E_Delta.at(0), "absdiff", 1e-6)){
+		return float_value(szone.getSZone()->checkIfAdmissible_reb(_learner->getModel(), E_Delta, 1.-cfg().beta_mu));
+	}else{
+		return float_value(szone(_learner->getModel(), E_Delta));
+	}
 }
 
 void learning_node::update_stream(arma::mat& batch, arma::mat& labels){

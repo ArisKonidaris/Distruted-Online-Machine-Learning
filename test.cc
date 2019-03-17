@@ -39,58 +39,8 @@ typedef boost::shared_ptr<hdf5Source<double>> PointToSource;
 
 int main(void){
 	
-	long int seed = -1;
-	if(seed>=0){
-		std::srand (seed);
-	}else{
-		std::srand (time(&seed));
-	}
-	
-	
-	float percentage = 0.5;
-	size_t nodes = 8;
-	set<set<set<size_t>>> dist;
-	
-	set<size_t> B;
-	set<size_t> B_compl;
-	
-	for(size_t i=0; i<nodes; i++){
-		B_compl.insert(i);
-	}
-	
-	for(size_t i=0; i<std::floor(nodes*percentage); i++){
-		size_t n = std::rand()%(nodes);
-		while(B.find(n) != B.end()){
-			n = std::rand()%(nodes);
-		}
-		B.insert(n);
-		B_compl.erase(n);
-	}
-	
-	for(size_t n : B)
-		cout << n << endl;
-	cout << endl;
-	for(size_t n : B_compl)
-		cout << n << endl;
-		
-	cout << "//////" << endl;
-	
-	int p[nodes]={};
-	for(size_t i =0; i<100; i++){
-		double n = ((double) rand() / (RAND_MAX));
-		if(n<0.75){
-			auto it = B.begin();
-			std::advance(it, (int)(std::rand()%(B.size())));
-			++p[*it];
-		}else{
-			auto it = B_compl.begin();
-			std::advance(it, (int)(std::rand()%(B_compl.size())));
-			++p[*it];
-		}
-	}
-		
-	for (size_t i=0; i<nodes; ++i)
-		cout << i << " : " << p[i] << endl;	
+	cout << sizeof(float) << endl;
+	cout << sizeof(float)*857738 << endl;
 		
 	return 0;
 }

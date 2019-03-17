@@ -533,8 +533,8 @@ void LeNet<feats,lbs>::Synch(){
 template<typename feats, typename lbs>
 void LeNet<feats,lbs>::update_model(const vector<resizable_tensor>& w){
 	for(size_t i=0;i<w.size();i++){
-		dlib::cpu::affine_transform(*this->parameters.at(i), w.at(i), 1., 0.);
-		//dlib::cuda::affine_transform(*this->parameters.at(i), w.at(i), 1.);
+		//dlib::cpu::affine_transform(*this->parameters.at(i), w.at(i), 1., 0.);
+		dlib::cuda::affine_transform(*this->parameters.at(i), w.at(i), 1.);
 	}
 	initialize_size();
 }
@@ -542,8 +542,8 @@ void LeNet<feats,lbs>::update_model(const vector<resizable_tensor>& w){
 template<typename feats, typename lbs>
 void LeNet<feats,lbs>::update_model(const vector<resizable_tensor*>& w){
 	for(size_t i=0;i<w.size();i++){
-		dlib::cpu::affine_transform(*this->parameters.at(i), *w.at(i), 1., 0.);
-		//dlib::cuda::affine_transform(*this->parameters.at(i), *w.at(i), 1.);
+		//dlib::cpu::affine_transform(*this->parameters.at(i), *w.at(i), 1., 0.);
+		dlib::cuda::affine_transform(*this->parameters.at(i), *w.at(i), 1.);
 	}
 	initialize_size();
 }

@@ -65,9 +65,13 @@ struct coordinator : process
 	size_t counter;                  // A counter used by the functional geometric protocol.
 	float barrier;                   // The smallest number the zeta function can reach.
 	size_t cnt;                      // Helping counter.
+	bool rebalanced;                 // Flag to check if the current round has be rebalanced.
+	size_t round_rebs;               // The number of rebalances ocuured in this round.
 	
 	vector<arma::mat> Params;        // A placeholder for the parameters send by the nodes.
-	vector<arma::mat> Beta;          // The beta vector used by the protocol for the rebalancing process.    
+	vector<arma::mat> Beta;          // The beta vector used by the protocol for the rebalancing process.
+	vector<arma::mat> temp;          // The beta vector used by the protocol for the rebalancing process.
+	
 
 	coordinator(network_t* nw, continuous_query* _Q); 
 	~coordinator();
@@ -159,6 +163,7 @@ struct learning_node : local_site {
 	size_t counter;                      // The counter used by the FGM protocol.
 	float quantum;                       // The quantum provided by the hub.
 	float zeta;                          // The value of the safezone function.
+	bool rebalanced;                     // Flag to check if the current round has be rebalanced.
 
 	learning_node(network_t* net, source_id hid, continuous_query_t* _Q)
 	:	local_site(net, hid), Q(_Q), coord( this )

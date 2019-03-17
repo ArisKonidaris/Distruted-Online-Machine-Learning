@@ -1436,7 +1436,7 @@ void DLIB_feeder<feats,lb,distrNetType>::initializeSimulation(){
 	}
 	msgs = 0;
 	bts = 0;
-	cout << endl << "Netwoks initialized." << endl;
+	cout << endl << "Networks initialized." << endl;
 }
 
 template<typename feats, typename lb, template<typename,typename> typename distrNetType>

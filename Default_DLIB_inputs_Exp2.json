@@ -1,0 +1,56 @@
+{
+
+	"simulations":{
+		"encoding" : "UTF-8",
+		"net_name_1" : "net1",
+		"number_of_networks" : 1,
+		"learning_problem" : "classification",
+		"data" : "tests_hdf5_Data",
+		"stream_distribution" : "Stream_Distribution1",
+		"log_diff_acc" : false,
+		"Communication_File" : "/home/aris/Desktop/Diplwmatikh/StartingCppDeveloping/Graphs/Exp001",
+		"Differential_Communication_File" : "/home/aris/Desktop/Diplwmatikh/StartingCppDeveloping/Graphs/Exp001/_Diff_Com.csv",
+		"seed" : -1
+	},
+
+	"tests_hdf5_Data":{
+		"encoding" : "UTF-8",
+		"batch_size" : 64,
+		"warmup_size" : 1000,
+		"test_size" : 10000,
+		"epochs" : 1
+	},
+
+	"Stream_Distribution1":{
+		"encoding" : "UTF-8",
+		"uniform" : true,
+		"B_prob" : 0.75,
+		"site_ratio" : 0.5
+	},
+
+	"gm_network_net1":{
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 4,
+		"learning_algorithm" : "LeNet",
+		"image_width" : 28,
+		"image_height" : 28,
+		"number_of_channels" : 1,
+		"distributed_learning_algorithm" : "dist_algo_net1"
+	},
+
+	"dist_algo_net1":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"reb_mult" : 1.0,
+		"threshold" : 0.0008,
+		"batch_size" : 64
+	},
+
+	"data" : {
+		"encoding" : "UTF-8",
+		"file_name" : "TestFile2.h5",
+		"train_dset_name" : "AMNIST_train",
+		"test_dset_name" : "MNIST_Test"
+	}
+
+}

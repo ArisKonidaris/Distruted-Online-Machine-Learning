@@ -148,6 +148,7 @@ struct ml_safezone_function {
 	virtual float checkIfAdmissible(const vector<arma::mat>& mdl) const { return 0.; }
 	virtual float checkIfAdmissible(const vector<arma::mat*>& mdl) const { return 0.; }
 	virtual float checkIfAdmissible(const vector<arma::mat*>& par1, const vector<arma::mat>& par2) const { return 0.; }
+	virtual float checkIfAdmissible_reb(const vector<arma::mat*>& par1, const vector<arma::mat>& par2, float coef) const { return 0.; }
 	
 	virtual float checkIfAdmissible_v2(const vector<arma::mat>& drift) const { return 0.; }
 	virtual float checkIfAdmissible_v2(const vector<arma::mat*>& drift) const { return 0.; }
@@ -200,6 +201,7 @@ struct Variance_safezone_func : ml_safezone_function {
 	float checkIfAdmissible(const vector<arma::mat>& mdl) const override;
 	float checkIfAdmissible(const vector<arma::mat*>& mdl) const override;
 	float checkIfAdmissible(const vector<arma::mat*>& par1, const vector<arma::mat>& par2) const override;
+	float checkIfAdmissible_reb(const vector<arma::mat*>& par1, const vector<arma::mat>& par2, float coef) const override;
 	
 	float checkIfAdmissible_v2(const vector<arma::mat>& drift) const override;
 	float checkIfAdmissible_v2(const vector<arma::mat*>& drift) const override;
@@ -326,12 +328,15 @@ struct query_state
 struct protocol_config
 {
 	string learning_algorithm;              // options : [ PA, KernelPA, MLP, PA_Reg, NN_Reg]
-	string distributed_learning_algorithm;  // options : [ Batch_Learning, Michael_Kmp, Michael_Kmp_Kernel ]
+	string distributed_learning_algorithm;  // options : [ Batch_Learning, Variance_Monitoring ]
 	string cfgfile;                         // The JSON file containing the info for the test.
 	string network_name;                    // The name of the network being queried.
 	
 	float precision = 0.01;                 // The precision of the FGM protocol.
 	float reb_mult = -1.;                   // The precision of the FGM protocol.
+	bool rebalancing = false;               // A boolean determining whether the monitoring protocol should run with rabalancing.
+	float beta_mu = 0.5;                    // Beta vector coefficient of rebalancing.
+	int max_rebs = 2;                       // Maximum number of rebalances
 };
 
 
@@ -501,6 +506,7 @@ struct dl_safezone_function {
 	virtual float checkIfAdmissible(const vector<resizable_tensor*>& pars) const { return 0.; }
 	virtual float checkIfAdmissible(const vector<tensor*>& pars) const { return 0.; }
 	virtual float checkIfAdmissible(const vector<tensor*>& par1, const vector<resizable_tensor*>& par2) const { return 0.; }
+	virtual float checkIfAdmissible_reb(const vector<tensor*>& par1, const vector<resizable_tensor*>& par2, float coef) const { return 0.; }
 	
 	virtual float Zeta(const vector<tensor*>& pars) const { return 0.; }
 	virtual float Zeta(const vector<resizable_tensor*>& pars) const { return 0.; }
@@ -557,6 +563,7 @@ struct Param_Variance_safezone_func : dl_safezone_function {
 	float checkAdmissibleNorm(const vector<resizable_tensor*>& pars) const override;
 	float checkAdmissibleNorm(const vector<tensor*>& pars) const override;
 	float checkIfAdmissible(const vector<tensor*>& par1, const vector<resizable_tensor*>& par2) const override;
+	float checkIfAdmissible_reb(const vector<tensor*>& par1, const vector<resizable_tensor*>& par2, float coef) const override;
 	float Zeta(const vector<tensor*>& pars) const override;
 	float Zeta(const vector<resizable_tensor*>& pars) const override;
 	
@@ -685,14 +692,17 @@ struct dl_query_state
 struct dl_protocol_config
 {
 	string learning_algorithm;              // options : [ PA, KernelPA, MLP, PA_Reg, NN_Reg, LeNet]
-	string distributed_learning_algorithm;  // options : [ Batch_Learning, Michael_Kmp, VarFuncMon ]
+	string distributed_learning_algorithm;  // options : [ Batch_Learning, Variance_Monitoring ]
 	string cfgfile;                         // The JSON file containing the info for the test.
 	string network_name;                    // The name of the network being queried.
 	int image_width = 28;                   // The pixel width of the image.
 	int image_height = 28;                  // The pixel height of the image.
 	int number_of_channels = 1;             // The number of channels of the image. (i.e. 3 in case of RGB image)
 	float precision = 0.01;                 // The precision of the FGM protocol.
+	bool rebalancing = false;               // A boolean determining whether the monitoring protocol should run with rabalancing.
 	float reb_mult = -1.;                   // The precision of the FGM protocol.
+	float beta_mu = 0.5;                    // Beta vector coefficient of rebalancing.
+	int max_rebs = 2;                       // Maximum number of rebalances
 };
 
 
@@ -726,19 +736,18 @@ dl_continuous_query<feat,label>::dl_continuous_query(std::vector<matrix<feat>>* 
 	std::ifstream cfgfl(cfg);
 	cfgfl >> root;
 	
-	config.learning_algorithm = root["gm_network_"+nm]
-						        .get("learning_algorithm", "Trash").asString();
+	config.learning_algorithm = root["gm_network_"+nm].get("learning_algorithm", "Trash").asString();
 	config.distributed_learning_algorithm = root["gm_network_"+nm]
 									        .get("distributed_learning_algorithm", "Trash").asString();
 	config.network_name = nm;
-	config.image_width = root["gm_network_"+nm]
-						 .get("image_width", 0).asInt64();
-	config.image_height = root["gm_network_"+nm]
-						  .get("image_height", 0).asInt64();
-	config.number_of_channels = root["gm_network_"+nm]
-						        .get("number_of_channels", 0).asInt64();
+	config.image_width = root["gm_network_"+nm].get("image_width", 0).asInt64();
+	config.image_height = root["gm_network_"+nm].get("image_height", 0).asInt64();
+	config.number_of_channels = root["gm_network_"+nm].get("number_of_channels", 0).asInt64();
 	config.precision = root[config.distributed_learning_algorithm].get("precision", 0.01).asFloat();
+	config.rebalancing = root[config.distributed_learning_algorithm].get("rebalancing", false).asBool();
 	config.reb_mult = root[config.distributed_learning_algorithm].get("reb_mult", -1.).asFloat();
+	config.beta_mu = root[config.distributed_learning_algorithm].get("beta_mu", 0.5).asFloat();
+	config.max_rebs = root[config.distributed_learning_algorithm].get("max_rebs", 2).asInt64();
 	config.cfgfile = cfg;
 	
 	cout << "Query initialized : " << config.learning_algorithm << ", ";

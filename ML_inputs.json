@@ -5,6 +5,18 @@
 		"net_name_1" : "net1",
 		"net_name_2" : "net2",
 		"net_name_3" : "net3",
+		"net_name_4" : "net4",
+		"net_name_5" : "net5",
+		"net_name_6" : "net6",
+		"net_name_7" : "net7",
+		"net_name_8" : "net8",
+		"net_name_9" : "net9",
+		"net_name_10" : "net10",
+		"net_name_11" : "net11",
+		"net_name_12" : "net12",
+		"net_name_13" : "net13",
+		"net_name_14" : "net14",
+		"net_name_15" : "net15",
 		"number_of_networks" : 1,
 		"learning_problem" : "classification",
 		"stream_distribution" : "Stream_Distribution1",
@@ -19,19 +31,19 @@
 		"batch_size" : 64,
 		"warmup_size" : 64, // Max size : 1000 data points.
 		"test_size" : 20000,
-		"experiment" : 4
+		"experiment" : 3
 	},
 
 	"Stream_Distribution1":{
 		"encoding" : "UTF-8",
-		"uniform" : false,
+		"uniform" : true,
 		"B_prob" : 0.75,
 		"site_ratio" : 0.5
 	},
 
 	"gm_network_net1":{ // format : gm_network_<network_name>
 		"encoding" : "UTF-8",
-		"number_of_local_nodes" : 4,
+		"number_of_local_nodes" : 32,
 		"learning_algorithm" : "ELM",
 		"parameters_of_learner" : "ELM",
 		"distributed_learning_algorithm" : "dist_algo_net1"
@@ -42,29 +54,281 @@
 		"number_of_local_nodes" : 8,
 		"learning_algorithm" : "ELM",
 		"parameters_of_learner" : "ELM",
-		"distributed_learning_algorithm" : "dist_algo_net1"
+		"distributed_learning_algorithm" : "dist_algo_net2"
 	},
 
 	"gm_network_net3":{ // format : gm_network_<network name>
 		"encoding" : "UTF-8",
-		"number_of_local_nodes" : 16,
+		"number_of_local_nodes" : 8,
 		"learning_algorithm" : "ELM",
 		"parameters_of_learner" : "ELM",
-		"distributed_learning_algorithm" : "dist_algo_net1"
+		"distributed_learning_algorithm" : "dist_algo_net3"
+	},
+	
+	"gm_network_net4":{ // format : gm_network_<network_name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net4"
+	},
+	
+	"gm_network_net5":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net5"
+	},
+
+	"gm_network_net6":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net6"
+	},
+	
+	"gm_network_net7":{ // format : gm_network_<network_name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net7"
+	},
+	
+	"gm_network_net8":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net8"
+	},
+
+	"gm_network_net9":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net9"
+	},
+	
+	"gm_network_net10":{ // format : gm_network_<network_name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net10"
+	},
+	
+	"gm_network_net11":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net11"
+	},
+
+	"gm_network_net12":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net12"
+	},
+	
+	"gm_network_net13":{ // format : gm_network_<network_name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net13"
+	},
+	
+	"gm_network_net14":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net14"
+	},
+
+	"gm_network_net15":{ // format : gm_network_<network name>
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 8,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net15"
 	},
 	
 	"dist_algo_net1":{
-		"algorithm" : "Michael_Kamp", // Michael_Kamp
+		"algorithm" : "Variance_Monitoring",
 		"precision" : 0.01,
-		"reb_mult" : 1.0, // Give a positive value only for rebalancing
 		"threshold" : 90000000,
-		"batch_size" : 64
+		"batch_size" : 64,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net2":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 70000000,
+		"batch_size" : 128,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net3":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 70000000,
+		"batch_size" : 192,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	"dist_algo_net4":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 80000000,
+		"batch_size" : 64,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net5":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 80000000,
+		"batch_size" : 128,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net6":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 80000000,
+		"batch_size" : 192,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net7":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 90000000,
+		"batch_size" : 64,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net8":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 90000000,
+		"batch_size" : 128,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net9":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 90000000,
+		"batch_size" : 192,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net10":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 100000000,
+		"batch_size" : 64,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net11":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 100000000,
+		"batch_size" : 128,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net12":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 100000000,
+		"batch_size" : 192,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net13":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 110000000,
+		"batch_size" : 64,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net14":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 110000000,
+		"batch_size" : 128,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
+	},
+	
+	"dist_algo_net15":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"threshold" : 110000000,
+		"batch_size" : 192,
+		"rebalancing" : true,  // Whether to run the distributed monitoring protocol with rebalancing
+		"reb_mult" : 1.0,      // Give a positive value only for rebalancing
+		"beta_mu" : 0.5,       // Beta vector coefficient of rebalancing
+		"max_rebs" : 2         // Maximum number of rebalances
 	},
 
 	"ELM" : {
 		"encoding" : "UTF-8",
 		"batch_size" : 64,
-		"neurons" : 250
+		"neurons" : 192
 	}
 
 }

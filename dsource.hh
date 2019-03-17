@@ -64,6 +64,9 @@ public:
 		Rewind the data source.
 	  */
 	virtual void rewind() { }
+	
+	// Virtual destructor
+	virtual ~data_source() { }
 
 };
 

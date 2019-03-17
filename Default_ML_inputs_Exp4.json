@@ -1,0 +1,53 @@
+{
+
+	"simulations":{
+		"encoding" : "UTF-8",
+		"net_name_1" : "net1",
+		"number_of_networks" : 1,
+		"learning_problem" : "classification",
+		"stream_distribution" : "Stream_Distribution1",
+		"data" : "tests_hdf5_Data",
+		"log_diff_acc" : false,
+		"Communication_File" : "/home/aris/Desktop/Diplwmatikh/StartingCppDeveloping/Graphs/Exp001/Com.csv",
+		"Differential_Communication_File" : "/home/aris/Desktop/Diplwmatikh/StartingCppDeveloping/Graphs/Exp001/_Diff_Com.csv",
+		"seed" : -1
+	},
+
+	"tests_hdf5_Data":{
+		"encoding" : "UTF-8",
+		"batch_size" : 64,
+		"warmup_size" : 64,
+		"test_size" : 20000,
+		"experiment" : 1
+	},
+
+	"Stream_Distribution1":{
+		"encoding" : "UTF-8",
+		"uniform" : true,
+		"B_prob" : 0.75,
+		"site_ratio" : 0.5
+	},
+
+	"gm_network_net1":{
+		"encoding" : "UTF-8",
+		"number_of_local_nodes" : 4,
+		"learning_algorithm" : "ELM",
+		"parameters_of_learner" : "ELM",
+		"distributed_learning_algorithm" : "dist_algo_net1"
+	},
+	
+	"dist_algo_net1":{
+		"algorithm" : "Variance_Monitoring",
+		"precision" : 0.01,
+		"reb_mult" : 1.0,
+		"threshold" : 90000000,
+		"batch_size" : 64
+	},
+
+	"ELM" : {
+		"encoding" : "UTF-8",
+		"batch_size" : 64,
+		"neurons" : 250
+	}
+
+}
